@@ -1,0 +1,35 @@
+huseyinfiliz-language-detection:
+  admin:
+    settings:
+      detection_order_label: Algılama sırası
+      detection_order_help: Bir ziyaretçinin dili belirlenirken hangi sinyalin önce denendiği.
+      detection_order_browser_ip: Tarayıcı dili, ardından IP ülkesi
+      detection_order_ip_browser: IP ülkesi, ardından tarayıcı dili
+
+      default_locale_label: Yedek dil
+      default_locale_help: Hiçbir şey algılanamadığında uygulanır. Flarum'un kendi davranışını korumak için forum varsayılanında bırakın.
+      default_locale_forum_default: Forum varsayılanı
+
+      enable_analytics_label: Dil istatistiklerini topla
+      enable_analytics_help: Ziyaretçilerin talep ettiği dillerin ve ülkelerin günlük toplu sayımlarını kaydeder. IP adresi, istek başlığı veya ziyaretçi kimliği saklanmaz.
+
+      ignore_bots_label: Botları ve tarayıcı robotlarını yoksay
+      ignore_bots_help: Bilinen botları ve arama motoru robotlarını istatistiklerin dışında tutar. Dilleri yine algılanır, yalnızca sayıma dahil edilmez.
+
+      retention_days_label: İstatistikleri saklama süresi
+      retention_days_help: Bundan daha eski günlük kayıtlar otomatik olarak silinir.
+      retention_days_never: Hiçbir zaman silme
+      retention_days_30: 30 gün
+      retention_days_90: 90 gün
+      retention_days_180: 180 gün
+      retention_days_365: 365 gün
+
+    ip_data:
+      notice: IP ülke araması, bu eklentiyle birlikte gelen ve {date} tarihinde herkese açık bölgesel internet kayıt kuruluşu verilerinden oluşturulmuş bir veri kümesini kullanır. Eklentiyi güncellemek bu veriyi yeniler.
+      notice_unavailable: Eklentiyle birlikte gelen IP veri kümesi eksik, bu nedenle IP ülke araması etkin değil ve yalnızca tarayıcı dili algılaması kullanılacak.
+
+    cleanup:
+      command_description: Yapılandırılan saklama süresinden daha eski dil algılama istatistiklerini siler.
+      retention_disabled: İstatistiklerin hiçbir zaman silinmemesi ayarlandığı için hiçbir kayıt kaldırılmadı.
+      deleted: "{days} günden eski {count} istatistik kaydı silindi."
+      nothing_to_delete: Silinecek kadar eski istatistik yok.

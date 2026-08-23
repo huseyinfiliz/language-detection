@@ -1,13 +1,23 @@
 {
     "name": "huseyinfiliz/language-detection",
-    "description": "Automatically selects the visitor&#39;s Flarum language based on their browser language or IP location.",
+    "description": "Automatically selects the visitor's Flarum language based on their browser language or IP location.",
     "keywords": [
-        "flarum"
+        "flarum",
+        "language",
+        "locale",
+        "i18n",
+        "detection",
+        "analytics"
     ],
     "type": "flarum-extension",
     "license": "MIT",
+    "support": {
+        "issues": "https://github.com/huseyinfiliz/language-detection/issues",
+        "source": "https://github.com/huseyinfiliz/language-detection"
+    },
     "require": {
-        "flarum/core": "^1.2.0"
+        "php": "^8.0",
+        "flarum/core": "^1.8.0"
     },
     "authors": [
         {
@@ -24,19 +34,19 @@
     "extra": {
         "flarum-extension": {
             "title": "Language Detection",
-            "category": "",
+            "category": "language",
             "icon": {
-                "name": "",
-                "color": "",
-                "backgroundColor": ""
+                "name": "fas fa-language",
+                "color": "#fff",
+                "backgroundColor": "#2980b9"
             }
         },
         "flarum-cli": {
             "modules": {
                 "admin": true,
-                "forum": true,
+                "forum": false,
                 "js": true,
-                "jsCommon": true,
+                "jsCommon": false,
                 "css": true,
                 "locale": true,
                 "gitConf": true,

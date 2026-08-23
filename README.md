@@ -2,7 +2,7 @@
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg) [![Latest Stable Version](https://img.shields.io/packagist/v/huseyinfiliz/language-detection.svg)](https://packagist.org/packages/huseyinfiliz/language-detection) [![Total Downloads](https://img.shields.io/packagist/dt/huseyinfiliz/language-detection.svg)](https://packagist.org/packages/huseyinfiliz/language-detection)
 
-A [Flarum](https://flarum.org) extension. Automatically selects the visitor&#39;s Flarum language based on their browser language or IP location.
+A [Flarum](https://flarum.org) extension. Automatically selects the visitor's Flarum language based on their browser language or IP location.
 
 ## Installation
 
@@ -24,4 +24,3 @@ php flarum cache:clear
 
 - [Packagist](https://packagist.org/packages/huseyinfiliz/language-detection)
 - [GitHub](https://github.com/huseyinfiliz/language-detection)
-- [Discuss](https://discuss.flarum.org/d/PUT_DISCUSS_SLUG_HERE)

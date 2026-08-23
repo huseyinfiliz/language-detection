@@ -1,0 +1,87 @@
+dir	package	code	title_as_published
+afrikaans	flarum-lang/afrikaans	af	Afrikaans
+albanian	flarum-lang/albanian	sq	Albanian
+arabic	flarum-lang/arabic	ar	Arabic
+armenian	flarum-lang/armenian	hy	Armenian
+asturian	flarum-lang/asturian	ast	Asturian
+azerbaijani	flarum-lang/azerbaijani	az	Azerbaijani
+basque	flarum-lang/basque	eu	Basque
+belarusian	flarum-lang/belarusian	be	Belarusian
+bengali	flarum-lang/bengali	bn	Bengali
+bosnian	flarum-lang/bosnian	bs	Bosnian
+brazilian	flarum-lang/brazilian	pt-BR	Brazilian Portuguese
+breton	flarum-lang/breton	br	Breton
+bulgarian	flarum-lang/bulgarian	bg	Български
+burmese	flarum-lang/burmese	my	Burmese
+catalan	flarum-lang/catalan	ca	Catalan
+chinese-simplified	flarum-lang/chinese-simplified	zh-Hans	简体中文
+chinese-traditional	flarum-lang/chinese-traditional	zh-Hant	Chinese (Traditional)
+croatian	flarum-lang/croatian	hr	Croatian
+czech	flarum-lang/czech	cs	Czech
+danish	flarum-lang/danish	da	Danish
+dutch	flarum-lang/dutch	nl	Dutch
+esperanto	flarum-lang/esperanto	eo	Esperanto
+estonian	flarum-lang/estonian	et	Estonian
+filipino	flarum-lang/filipino	fil	Filipino
+finnish	flarum-lang/finnish	fi	Finnish
+french	flarum-lang/french	fr	French
+galician	flarum-lang/galician	gl	Galician
+georgian	flarum-lang/georgian	ka	Georgian
+german	flarum-lang/german	de	German
+greek	flarum-lang/greek	el	Greek
+hebrew	flarum-lang/hebrew	he	עברית
+hindi	flarum-lang/hindi	hi	hindi
+hungarian	flarum-lang/hungarian	hu	Hungarian
+icelandic	flarum-lang/icelandic	is	Icelandic
+indonesian	flarum-lang/indonesian	id	Indonesian
+irish	flarum-lang/irish	ga	Irish
+italian	flarum-lang/italian	it	Italiano
+japanese	flarum-lang/japanese	ja	Japanese
+kabyle	flarum-lang/kabyle	kab	Kabyle
+kannada	flarum-lang/kannada	kn	Kannada
+kazakh	flarum-lang/kazakh	kk	Kazakh
+khmer	flarum-lang/khmer	km	Khmer
+korean	flarum-lang/korean	ko	한국어
+kurdish-central	flarum-lang/kurdish-central	ckb	Kurdish (Central)
+kurdish-northern	flarum-lang/kurdish-northern	kmr	Kurdish (Northern)
+latvian	flarum-lang/latvian	lv	Latvian
+lithuanian	flarum-lang/lithuanian	lt	Lithuanian
+macedonian	flarum-lang/macedonian	mk	Macedonian
+malayalam	flarum-lang/malayalam	ml	Malayalam
+malaysian	flarum-lang/malaysian	ms	Malaysian
+marathi	flarum-lang/marathi	mr	Marathi
+nepali	flarum-lang/nepali	ne	Nepali
+norwegian-bokmal	flarum-lang/norwegian-bokmal	nb	Norwegian Bokmål
+norwegian-nynorsk	flarum-lang/norwegian-nynorsk	nn	Norwegian Nynorsk
+occitan	flarum-lang/occitan	oc	Occitan
+persian	flarum-lang/persian	fa	Persian
+polish	flarum-lang/polish	pl	Polish
+portuguese	flarum-lang/portuguese	pt	Portuguese
+punjabi	flarum-lang/punjabi	pa	Punjabi
+romanian	flarum-lang/romanian	ro	Romanian
+russian	flarum-lang/russian	ru	Русский
+sardinian	flarum-lang/sardinian	sc	Sardinian
+serbian-cyrillic	flarum-lang/serbian-cyrillic	sr-Cyrl	Serbian (Cyrillic)
+serbian-latin	flarum-lang/serbian-latin	sr-Latn	Serbian (Latin)
+sinhala	flarum-lang/sinhala	si	Sinhala
+slovak	flarum-lang/slovak	sk	Slovak
+slovenian	flarum-lang/slovenian	sl	Slovenian
+spanish	flarum-lang/spanish	es	Spanish
+spanish-argentina	flarum-lang/spanish-argentina	es_AR	Spanish (Argentina)
+spanish-mexico	flarum-lang/spanish-mexico	es_MX	Spanish (Mexico)
+swedish	flarum-lang/swedish	sv	Swedish
+tagalog	flarum-lang/tagalog	tl	Tagalog
+tajik	flarum-lang/tajik	tg	Tajik
+tamil	flarum-lang/tamil	ta	Tamil
+tatar	flarum-lang/tatar	tt	Tatar
+telugu	flarum-lang/telugu	te	Telugu
+thai	flarum-lang/thai	th	Thai
+toki-pona	flarum-lang/toki-pona	tok	Toki Pona
+turkish	flarum-lang/turkish	tr	Turkish
+turkmen	flarum-lang/turkmen	tk	Turkmen
+ukrainian	flarum-lang/ukrainian	uk	Українська
+urdu	flarum-lang/urdu	ur	Urdu
+uyghur	flarum-lang/uyghur	ug	Uyghur
+uzbek	flarum-lang/uzbek	uzb	Uzbek
+vietnamese	flarum-lang/vietnamese	vi	Vietnamese
+welsh	flarum-lang/welsh	cy	Welsh
