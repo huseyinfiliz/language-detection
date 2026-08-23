@@ -1,11 +1,19 @@
 # Handoff — `huseyinfiliz/language-detection` (Flarum 1.x)
 
-> **Status: Phase 1 (investigation) and Phase 2 (skeleton & initial setup) complete. Phase 3 is next.**
+> **Status: Phase 1 (investigation) and Phase 2 (skeleton & initial setup) are complete. Phase 3 is next —
+> the full work order is §14. Start there.**
 > This file exists so a fresh session can resume without re-doing discovery.
 > It is a working document — remove it (or gitignore it) before release.
 >
-> Nothing is committed yet beyond `5bed04d Initial release`. `.claude/`, `HANDOFF.md`, `CHANGELOG.md`,
-> `locale/tr.yml`, `migrations/`, and `resources/` are all still untracked.
+> **Repository state, 2026-08-24:** branch `1.x`, working tree clean, in sync with `origin/1.x`.
+> Commit `11077ea` *"Phase 2: skeleton, settings, migration, and bundled catalogs"* (17 files, +1184/−32) is
+> pushed, on top of `5bed04d Initial release`. Everything this document describes as built is committed —
+> nothing is untracked.
+>
+> **Commit convention (standing instruction from the project owner):** author **and** committer are
+> `Hüseyin Filiz <mysuperuser01@gmail.com>`; never add a `Co-Authored-By: Claude … <noreply@anthropic.com>`
+> trailer, and never put `noreply@anthropic.com` anywhere in commit metadata. See §2 for the two git
+> failure modes this repo hits.
 
 ---
 
@@ -63,6 +71,10 @@ Consequences:
 | `/tmp/hf-awards`, `/tmp/lang-about`, `/tmp/lang-utils` | secondary references |
 | `/tmp/langpacks/*` | all **86** official `flarum-lang` packs |
 
+> All of the above were **verified still present on 2026-08-24**. They live in temp directories, so re-clone
+> if a later session finds them gone; the Flarum core checkout is the one Phase 3 actually needs.
+> Note the core checkout is **sparse and has no `vendor/`** — Symfony/Illuminate source cannot be read from it.
+>
 > `Read` fails on `/tmp/...` paths; resolve with `pwd -W` and use the `C:/Users/...` form.
 > `raw.githubusercontent.com` returns **405** via WebFetch — clone with git, or fetch `github.com` HTML /
 > `api.github.com` instead.
@@ -76,6 +88,33 @@ workspace so it survives session loss. This is the input for `resources/language
 Important: the published `title` fields are **inconsistent** — a mix of English and native names
 (`Turkish`, but `日本語`, `Русский`, `Български`, `Italiano`), and one is lowercase (`hindi`). **Do not reuse
 them verbatim.** The extension must ship its own curated English + native names.
+
+### Test infrastructure (scaffolded and committed — no test written yet)
+
+| Path | Notes |
+|---|---|
+| `tests/phpunit.unit.xml` | suite is `./unit`, suffix `Test.php`; registers Mockery's `TestListener`, so **Mockery is available** |
+| `tests/phpunit.integration.xml` + `tests/integration/setup.php` | integration suite; needs a real database (`composer test:setup`, run once) |
+| `tests/unit/.gitkeep`, `tests/fixtures/.gitkeep` | empty placeholders |
+
+`composer.json` has `require-dev: flarum/testing ^1.0.0` and maps `autoload-dev` PSR-4
+`HuseyinFiliz\LanguageDetection\Tests\` → `tests/`. Scripts: `composer test:unit`, `test:integration`, `test`.
+
+**Namespace convention:** `tests/unit/FooTest.php` declares `HuseyinFiliz\LanguageDetection\Tests\Unit\FooTest`
+— capital `Unit` against a lowercase `unit/` directory. Both `fof/badges` and the author's
+`huseyinfiliz/awards` do exactly this; it works because PHPUnit `require`s each discovered file directly, so
+PSR-4 is never asked to resolve the class. **Consequence:** a shared helper or fixture *class* placed in
+`tests/unit/` would fail to autoload on case-sensitive Linux CI. Keep test classes self-contained, or put
+shared fixtures in `tests/fixtures/` and require them explicitly.
+
+### Two git failure modes in this repo
+
+1. `git config user.name` / `user.email` were **empty**. Git then refuses to commit, and from this harness the
+   failure surfaces as a *missing tool result* rather than git's "please tell me who you are". Both are now set
+   repo-locally in `.git/config` (global config untouched) — but re-check in a fresh clone.
+2. `git commit -F -` fed by a heredoc failed repeatedly. Write the message to a file **outside** the repo
+   (e.g. under `$TMPDIR`) and use `git commit -F <file>`. Verify afterwards with
+   `git log -1 --pretty='%an <%ae>%n%cn <%ce>'`.
 
 ---
 
@@ -225,8 +264,11 @@ Three catalog irregularities that must be handled, not normalized away:
 `LocaleMatcher` compares **case-insensitively and separator-insensitively** against
 `LocaleManager::getLocales()` keys, then applies the installed locale's **exact original key**.
 
-Order: exact match → base-language fallback (`pt-BR` → `pt`) → sibling regional variant if only one exists →
-no match. Never hardcode a locale list; always read `getLocales()` / `hasLocale()`.
+Order, applied **per candidate** in preference order (not as tier-by-tier sweeps across all candidates):
+exact match → progressive one-subtag-at-a-time truncation (`zh-Hans-CN` → `zh-Hans` → `zh`) → sibling regional
+variant if exactly one exists → no match. Never hardcode a locale list; always read `getLocales()` /
+`hasLocale()`. **§14 is the authoritative version of this algorithm**, including why per-candidate ordering
+matters and the single `uzb`/`uz` alias.
 
 ---
 
@@ -345,6 +387,15 @@ nothing**. Only write a preference for a user who has none. `locale` is a core-r
   but **only that one**. `addLocale()` has exactly two callers in core (`Extend\LanguagePack` per installed
   pack, and `LocaleServiceProvider::register()` for `default_locale`), so `hasLocale('en')` is false on any
   forum whose `default_locale` is not `en`. See the correction box in §3.
+- **Core contains no `Accept-Language` handling whatsoever** — grepped the whole of `src/`: zero hits for
+  `Accept-Language` / `acceptLanguage`. `Http\Middleware\SetLocale` reads only the user preference and the
+  `locale` cookie. So the header parser must be written from scratch; there is nothing in core to reuse or
+  extend.
+- `LocaleManager` is **trivially constructible in a unit test**: it is a plain class (no container bindings, no
+  interfaces) whose constructor is `__construct(Translator $translator, string $cacheDir = null)`, and
+  `addLocale()`/`getLocales()`/`hasLocale()` are simple array operations on a protected `$locales` map.
+  `Flarum\Locale\Translator` extends Symfony's `Translator`, whose constructor takes a locale string. So a real
+  `new LocaleManager(new Translator('en'))` with a few `addLocale()` calls is preferable to a Mockery double.
 - `Extend\Middleware`: `add`, `replace`, `remove`, `insertBefore`, `insertAfter`.
 - `Extend\Console`: `command(string)`, `schedule(command, callback, args = [])`.
 - `Extend\Settings`: `default()`, `serializeToForum()`. Not needed for the forum payload here — settings are
@@ -466,9 +517,10 @@ Decisions taken during Phase 2 — all deliberate, all reversible:
    than invented. The mandatory privacy/features prose is Phase 10's job, per §12 — writing it now would
    document behaviour that does not exist yet.
 
-**Phase 3 — Browser detection (start here).** `BrowserLanguageParser` (q-values, ordering, region subtags,
-malformed and empty input) + `LocaleMatcher` (exact → base → sibling → none) + default fallback. Unit tests.
-Read the §3 correction box first: `en` is **not** a guaranteed fallback.
+**Phase 3 — Browser detection. ← NEXT. Full work order in §14; read that instead of this paragraph.**
+`BrowserLanguageParser` (q-values, ordering, region subtags, malformed and empty input) + `LocaleMatcher`
+(exact → progressive truncation → unambiguous sibling → none) + unit tests. Read the §3 correction box first:
+`en` is **not** a guaranteed fallback.
 
 **Phase 4 — Apply & remember.** `Middleware/DetectLanguage` inserted before `SetLocale`; guest cookie;
 authenticated users **only when they have no locale**; one-time behaviour. Integration tests, including
@@ -506,3 +558,163 @@ tests, README (privacy section is mandatory), CHANGELOG. **Do not begin the Flar
 4. **RIR precision** is registrant-level and coarser than commercial DBs. Acceptable for language selection;
    DB-IP Lite is the documented upgrade path if it proves insufficient.
 5. **Cookie-based unique counts are approximate** by design — a deliberate privacy tradeoff to document.
+6. **`Translator::setLocale()` input validation is unverified.** Symfony's `Translator::setLocale()` calls
+   `assertValidLocale()`, whose accepted character set could not be checked here — the sparse core checkout has
+   no `vendor/`. Not a Phase 3 concern (matching only ever *returns* keys that are already in `getLocales()`,
+   i.e. codes Flarum itself registered), but confirm it before Phase 4 calls `setLocale()` with a value like
+   `es_MX` or `zh-Hans`.
+
+---
+
+## 14. Phase 3 work order — start here
+
+**Goal:** two pure, dependency-light classes plus their unit tests. Browser-language *detection and
+resolution* only. Nothing is wired up yet.
+
+### Scope discipline — what Phase 3 must NOT touch
+
+- **No middleware.** `Middleware/DetectLanguage` is Phase 4.
+- **No analytics, no database, no cookies.** Phases 4 and 6.
+- **No IP lookup, no `resources/countries.php` consumer.** `CountryLanguage` is Phase 5.
+- **No admin UI, no new locale keys.** Phase 8.
+- **Do not register these classes in `extend.php`.** It currently references no project classes at all, which
+  is what lets the extension load; leave it that way until Phase 4 has something to wire. Adding a
+  `use`/reference now buys nothing and risks a fatal on an installed forum.
+
+### Deliverables
+
+```
+src/BrowserLanguageParser.php
+src/LocaleMatcher.php
+tests/unit/BrowserLanguageParserTest.php
+tests/unit/LocaleMatcherTest.php
+```
+
+Namespace `HuseyinFiliz\LanguageDetection\`; tests in `HuseyinFiliz\LanguageDetection\Tests\Unit\` (see §2 for
+the lowercase-directory caveat). No changes to any other file except `CHANGELOG.md`.
+
+### `BrowserLanguageParser`
+
+Turns a raw `Accept-Language` header into an **ordered list of language tags, most preferred first**. Pure
+function, no dependencies, no I/O, no knowledge of installed locales — that separation is what makes both
+classes independently testable.
+
+```php
+public function parse(?string $header): array   // string[], most-preferred first
+```
+
+Rules:
+
+1. `null`, empty, or whitespace-only → `[]`.
+2. **Cap the input** at ~1024 bytes and the output at ~10 tags before doing any work. Pure hygiene against a
+   pathological header, not a real attack vector.
+3. Split on `,`; each element is `tag` optionally followed by `;q=<value>`.
+4. Missing `q` → `1.0`. An **unparseable** `q` (`;q=abc`, `;q=`) → treat as `1.0` and keep the tag; the tag
+   itself is still a valid signal. Clamp to `[0,1]`.
+5. **`q=0` means "explicitly not acceptable"** → drop that tag entirely.
+6. `*` → drop. It carries no signal, and the fallback chain already covers "anything".
+7. Shape-validate each tag against `/^[A-Za-z]{1,8}([-_][A-Za-z0-9]{1,8})*$/` and drop anything else. This is
+   the injection guard — never pass unvalidated header text onward. Underscores are **accepted** even though
+   browsers send hyphens: a client sending `tr_TR` is giving us real information, and `LocaleMatcher`
+   normalizes separators anyway.
+8. Sort by `q` descending, **stable**, so header order is preserved among equal q-values (browsers list in
+   preference order). PHP 8.0+ sorts are stable and `composer.json` requires `php: ^8.0`, so `usort` is enough
+   — no decorate-sort-undecorate needed.
+9. Deduplicate case-insensitively, keeping the highest-q (first) occurrence.
+10. **Preserve each tag's original case verbatim.** Normalization belongs to `LocaleMatcher`.
+11. A malformed element must never discard the valid ones — skip individually, never throw.
+
+Tests: `'tr,en;q=0.8'`→`['tr','en']`; `'en;q=0.8,tr'`→`['tr','en']` (q beats position);
+`'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7'`→ all four in order; `'fr;q=0.5,de;q=0.5'`→`['fr','de']` (stable);
+`'tr-TR'`→`['tr-TR']` (region preserved — truncation is the matcher's job); `'zh-Hans-CN,zh-Hans;q=0.9'`→ both;
+`'EN-us'`→`['EN-us']`; `'*'`, `'en;q=0'`, `null`, `''`, `'   '`, `','`, `';;;'` → `[]`; `'en;q=0,tr'`→`['tr']`;
+`'<script>alert(1)</script>,tr'`→`['tr']`; `'en;q=abc'`→`['en']`; 20 elements → capped at 10; a 5000-char
+header → does not blow up.
+
+### `LocaleMatcher`
+
+Resolves parsed tags to an **installed** locale.
+
+```php
+public function __construct(LocaleManager $locales) {}
+
+/** @param string[] $candidates ordered, most preferred first */
+public function match(array $candidates): ?string;   // an exact key from getLocales(), or null
+```
+
+**Normalization for comparison** (never for output): lowercase, `_` → `-`. Build a
+`normalized => original key` map from `array_keys($locales->getLocales())` once per instance, lazily. If two
+installed keys normalize identically, first wins — document it; it cannot happen with the real catalog.
+
+**Critical: iterate per candidate, applying all tiers to each, in preference order.** Do *not* run a global
+exact-match pass across all candidates first. With installed `[en, pt]` and candidates `['pt-BR','en']`,
+per-candidate correctly yields **`pt`** (the visitor prefers Portuguese), while a tier-by-tier sweep would
+wrongly return `en`. This matches RFC 4647 "lookup" behaviour and is the single most important test in the
+file.
+
+For each candidate, in order:
+
+1. **Exact** (normalized) → return the installed key's original spelling. So `es-MX` → returns **`es_MX`**,
+   underscore and all; `zh-hans` → returns `zh-Hans`.
+2. **Progressive truncation**, one subtag at a time: `zh-Hans-CN` → `zh-Hans` → `zh`. Not a single strip to the
+   base language — `zh-Hans` and `sr-Cyrl` are real installed keys, and truncating straight to `zh` would skip
+   the pack that actually matches.
+3. **Unambiguous sibling:** collect installed keys sharing this candidate's base language. If **exactly one**,
+   return it; if more, decline rather than guess. So `pt-PT` (or bare `pt`) → `pt-BR` when that is the only
+   `pt*` installed; `sr` → `null` when both `sr-Cyrl` and `sr-Latn` are installed.
+4. No hit → move to the next candidate.
+
+Return **`null`** when nothing matches. **Never substitute `en`** (§3 correction box) and do not apply the
+`default_locale` fallback here — the caller does that in Phase 4. The matcher *must* be able to report "no
+match", because that `null` is exactly the signal the missing-languages report (Phase 7) is built on.
+
+#### Code aliasing — resolved against the real catalog, do not re-litigate
+
+The 87 catalog keys were checked for codes that a browser could never match. Every three-letter key —
+`ast`, `fil`, `kab`, `ckb`, `kmr`, `tok` — has **no** ISO 639-1 equivalent, so browsers send it verbatim and
+exact matching already works. Exactly one is broken:
+
+- **`uzb` (Uzbek) is non-ISO-639-1 and `uz` exists.** A browser sending `uz` / `uz-UZ` would match nothing.
+  Add a one-entry alias applied *during normalization of both sides* — `['uzb' => 'uz']` — so installed `uzb`
+  normalizes to `uz`, candidate `uz` matches it, and the returned key is still the original `uzb`. This is code
+  equivalence, not a hardcoded locale list, and it is the only such case.
+
+Deliberately **not** aliased:
+
+- **`ku` → `ckb`/`kmr`** — `ku` is a macrolanguage and *both* Kurdish packs exist, so it is genuinely
+  ambiguous. Declining is consistent with tier 3.
+- **`no` → `nb`/`nn`** — same situation, and `no` is common in the wild. *Optional* improvement if you want it:
+  feed a tiny macrolanguage map `['no' => ['nb','nn'], 'ku' => ['ckb','kmr']]` into **tier 3's existing
+  "exactly one installed" logic** rather than inventing a new mechanism. Skip it if you prefer strict
+  minimalism; it is not required for Phase 3 to be correct.
+- **Legacy codes** `iw`/`in`/`ji`/`mo` — modern browsers send `he`/`id`/`yi`/`ro`. Not worth carrying.
+
+#### Known gap, already covered elsewhere — do not build a script table
+
+`zh-CN` truncates to `zh` (not installed), then tier 3 finds two `zh*` siblings and declines → `null`. Mapping
+`zh-CN`→`zh-Hans` and `zh-TW`→`zh-Hant` would need a region→script table. **Don't add one:**
+`resources/countries.php` already handles it via IP detection (`CN => ['zh-Hans', …]`, `TW => ['zh-Hant']`), so
+the case is covered without a new mechanism.
+
+Tests, with installed set `['en','tr','pt-BR','zh-Hans','zh-Hant','sr-Cyrl','sr-Latn','es_MX','uzb']`:
+`['tr']`→`tr`; `['tr-TR']`→`tr`; `['TR']`→`tr`; `['pt-BR']`→`pt-BR`; `['pt-PT']`→`pt-BR`; `['pt']`→`pt-BR`;
+`['es-MX']`→`es_MX`; `['es_MX']`→`es_MX`; `['zh-Hans-CN']`→`zh-Hans`; `['zh-CN']`→`null`; `['sr']`→`null`;
+`['sr-Cyrl']`→`sr-Cyrl`; `['uz']`→`uzb`; `['uz-UZ']`→`uzb`; `['de','tr']`→`tr`; `[]`→`null`; `['xx-YY']`→`null`.
+Plus the two that encode the decisions above:
+
+- **Ordering:** installed `['en','pt']`, candidates `['pt-BR','en']` → **`pt`**, not `en`.
+- **§3 correction:** installed `['tr']` only (a forum with `default_locale = tr`), candidates `['en']` →
+  **`null`**. `en` is not a fallback.
+- **Ambiguous `es`:** installed `['es_AR','es_MX']`, candidates `['es']` → `null` (two siblings).
+
+### Verification available in this environment
+
+There is **no PHP**, so nothing can be executed — no phpunit, no syntax check. CI (`.github/workflows/backend.yml`,
+`enable_backend_testing: true`) is the only gate. **Never state or imply that the tests pass.** Say what was
+written and that it is unverified until CI runs. Structural checks that *are* possible: UTF-8 without BOM, LF
+endings, balanced braces, and StyleCI conformance by eye — the `recommended` preset with `align_double_arrow`,
+`multiline_array_trailing_comma`, `new_with_braces` and `blank_line_after_opening_tag` disabled
+(`.styleci.yml`).
+
+Finish by adding a `CHANGELOG.md` line under `## [Unreleased] / ### Added`, then commit per the convention in
+the status header above.
