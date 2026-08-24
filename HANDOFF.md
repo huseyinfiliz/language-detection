@@ -1,13 +1,13 @@
 # Handoff — `huseyinfiliz/language-detection` (Flarum 1.x)
 
-> **Status: Phases 1–3 are complete. Phase 4 (apply & remember) is next — see §7, which already
-> documents the middleware position and the user-locale rules it has to honour, plus the Phase 4
-> paragraph in §12.**
+> **Status: Phases 1–3 are complete. Phase 4 (apply & remember) is next — its full work order is §15;
+> start there.** §7 carries the middleware position, core's `SetLocale` source and the user-locale rules,
+> including a correction box added on 2026-08-24 that Phase 4 must read.
 > This file exists so a fresh session can resume without re-doing discovery.
 > It is a working document — remove it (or gitignore it) before release.
 >
-> **Repository state, 2026-08-24:** branch `1.x`, in sync with `origin/1.x` as of commit `cd52701`.
-> Phase 3 adds `src/BrowserLanguageParser.php`, `src/LocaleMatcher.php` and their two unit tests.
+> **Repository state, 2026-08-24:** branch `1.x`, pushed to `origin/1.x`.
+> Phase 3 (`702995c`) adds `src/BrowserLanguageParser.php`, `src/LocaleMatcher.php` and their two unit tests.
 > `extend.php` still references no project classes, by design (§14) — Phase 4 is the first phase that
 > wires anything up.
 >
@@ -60,7 +60,7 @@ Consequences:
   only be verified in CI (`.github/workflows/{backend,frontend}.yml`, already wired to `flarum/framework`
   reusable workflows, `main_git_branch: 1.x`, prettier + typescript enabled) or on the author's machine.
   Never claim tests pass locally.
-- `curl` + `perl` + `awk` **are** sufficient to download and generate the IP→country dataset (see §5).
+- `curl` + `perl` + `awk` **are** sufficient to download and generate the IP→country dataset (see §3).
 
 ### Reference clones (temp dirs — may vanish; re-clone as needed)
 
@@ -96,13 +96,14 @@ Important: the published `title` fields are **inconsistent** — a mix of Englis
 (`Turkish`, but `日本語`, `Русский`, `Български`, `Italiano`), and one is lowercase (`hindi`). **Do not reuse
 them verbatim.** The extension must ship its own curated English + native names.
 
-### Test infrastructure (scaffolded and committed — no test written yet)
+### Test infrastructure (scaffolded and committed; unit tests written in Phase 3)
 
 | Path | Notes |
 |---|---|
-| `tests/phpunit.unit.xml` | suite is `./unit`, suffix `Test.php`; registers Mockery's `TestListener`, so **Mockery is available** |
-| `tests/phpunit.integration.xml` + `tests/integration/setup.php` | integration suite; needs a real database (`composer test:setup`, run once) |
-| `tests/unit/.gitkeep`, `tests/fixtures/.gitkeep` | empty placeholders |
+| `tests/phpunit.unit.xml` | suite is `./unit`, suffix `Test.php`; registers Mockery's `TestListener`, so **Mockery is available**. Needs no `bootstrap` attribute — it is byte-for-byte flarum/testing's own unit config, and `vendor/bin/phpunit` loads the autoloader itself |
+| `tests/phpunit.integration.xml` + `tests/integration/setup.php` | integration suite; needs a real database (`composer test:setup`, run once), so it effectively only runs in CI |
+| `tests/unit/BrowserLanguageParserTest.php`, `tests/unit/LocaleMatcherTest.php` | Phase 3; base class `Flarum\Testing\unit\TestCase` (lowercase `unit` namespace segment, as the vendored class declares it) |
+| `tests/fixtures/.gitkeep` | still an empty placeholder — Phase 5's synthetic `.dat` fixtures land here. `tests/unit/.gitkeep` was removed once real tests existed |
 
 `composer.json` has `require-dev: flarum/testing ^1.0.0` and maps `autoload-dev` PSR-4
 `HuseyinFiliz\LanguageDetection\Tests\` → `tests/`. Scripts: `composer test:unit`, `test:integration`, `test`.
@@ -355,16 +356,49 @@ $request = $request->withAttribute('locale', $this->locales->getLocale());
 So: our middleware sets a detected locale; `SetLocale` then *overrides* it whenever an explicit user
 preference or `locale` cookie exists. An explicit choice always wins, automatically.
 
+> **Correction added 2026-08-24 (Phase 3), read before Phase 4 — core never writes a `locale` cookie.**
+> The middleware position and the whole "manual choice wins structurally" argument are correct, but the guest
+> half needs a caveat that changes how the cookie in §6 works. Grepped the entirety of `vendor/flarum/core`
+> (both `src/**.php` and `js/src/**`) for a `locale` cookie **write**: there is exactly **one** hit anywhere,
+> and it is the *read* in `SetLocale` quoted above. Nothing in core 1.8.19 ever sets that cookie.
+>
+> Two consequences:
+>
+> 1. `SetLocale` reads the raw cookie param **`locale`**, *not* `flarum_locale`. `CookieFactory::getName()` is
+>    `$this->prefix.'_'.$name` with `prefix` defaulting to `flarum` (`cookie.name` in config), so anything
+>    written through `CookieFactory` is invisible to `SetLocale`. Our `flarum_language_detection_locale`
+>    cookie (§6) therefore **cannot** work by feeding `SetLocale` — and should not try to.
+> 2. For a guest there is consequently no core-managed "manual choice" to be overridden: core 1.x ships no
+>    guest language switcher at all. The override still matters for **logged-in users** (via
+>    `getPreference('locale')`), and it still comes for free if a *third-party* language-switcher extension
+>    writes an unprefixed `locale` cookie — which is exactly the behaviour we want.
+>
+> So Phase 4's guest path is: call `$locales->setLocale($detected)` **directly**, and use our own prefixed
+> cookie purely as the "already detected, don't do it again" memo. `SetLocale` runs afterwards, finds no
+> `locale` cookie, skips its own `setLocale()`, and then propagates *our* value into the request attribute via
+> `withAttribute('locale', $this->locales->getLocale())`. Verified against the source above: the `if ($locale
+> && hasLocale($locale))` guard means a missing cookie is a no-op, not a reset.
+
 At that position the actor is already resolved (`AuthenticateWithSession` runs earlier) and `ipAddress` is
-already set by `ProcessIp` near the top. Registering on the `forum` frontend only, GET only, means this runs
-on page loads — not on every SPA XHR.
+already set by `ProcessIp` — which is piped in `Foundation\InstalledApp::getMiddlewareStack()`, *outside* the
+`flarum.forum.middleware` list, so it runs ahead of the entire forum pipeline. Registering on the `forum`
+frontend only, GET only, means this runs on page loads — not on every SPA XHR.
 
 **Gotcha:** `Extend\Middleware` stores `insertBefore` as `[$original => $new]`, keyed by the original class —
-so only **one** middleware can be inserted before `SetLocale` per extender instance. Fine here.
+so only **one** middleware can be inserted before `SetLocale` per extender instance. Fine here. Second gotcha
+in the same method: `extend()` does `array_splice($stack, array_search($original, $stack), 0, $new)`, and
+`array_search` returns `false` when the target is absent, which `array_splice` coerces to offset `0` — a
+missing anchor silently inserts at the **front** of the pipeline rather than erroring. `SetLocale` is always
+present on the forum frontend, so this cannot bite here, but do not reuse the pattern against a class that
+might not be registered.
 
 **User locale rules (spec §15, critical):** if `$user->getPreference('locale')` is already set → **do
 nothing**. Only write a preference for a user who has none. `locale` is a core-registered preference
-(`User::registerPreference('locale')`), read/written via `getPreference()` / `setPreference()`.
+(`User::registerPreference('locale')` in `UserServiceProvider:132`, with **no transformer and no default**, so
+`getPreference('locale')` returns `null` when unset), read/written via `getPreference()` / `setPreference()`.
+Note `setPreference()` is wrapped in `if (isset(static::$preferences[$key]))` — writing an *unregistered* key
+is a **silent no-op**, not an error. `locale` is registered, so this is only a warning against inventing new
+preference keys without an extender.
 
 ---
 
@@ -416,6 +450,26 @@ nothing**. Only write a preference for a user who has none. `locale` is a core-r
 - `ExtensionData`: `for()`, `registerPage()`, `registerSetting()`, `registerPermission()`. `AdminPage`
   provides `buildSettingComponent()`, `setting()`, `dirty()`, `saveSettings()`.
 - Cookies via `Flarum\Http\CookieFactory` + `dflydev/fig-cookies` (`FigResponseCookies`, `SetCookie`).
+  `CookieFactory::make()` returns a `SetCookie` whose name is `getName($name)` = `$this->prefix.'_'.$name`,
+  with `prefix` from `config('cookie.name')` defaulting to `flarum`; it also applies `path`, `domain`,
+  `secure` (from the config URL scheme), and `httpOnly(true)`. **A cookie written through `CookieFactory` is
+  therefore always prefixed**, which is why `SetLocale`'s unprefixed `locale` read cannot see it — see the
+  correction box in §7 before designing Phase 4's cookie.
+- `Extend\Middleware::insertBefore($original, $new)` stores `[$original => $new]` and applies it with
+  `array_splice($existing, array_search($original, $existing), 0, $new)`. `array_search` returns `false` for a
+  missing anchor, which `array_splice` reads as offset `0` — a typo'd target class silently moves the
+  middleware to the front of the stack instead of failing. `ProcessIp` is *not* in this list at all: it is
+  piped in `Foundation\InstalledApp::getMiddlewareStack()`, ahead of the whole forum pipeline, so
+  `$request->getAttribute('ipAddress')` is already populated anywhere in `flarum.forum.middleware`.
+- `User::registerPreference('locale')` (`UserServiceProvider:132`) is declared with **no transformer and no
+  default**, so `getPreference('locale')` is `null` until something writes it — a clean "has the user chosen?"
+  test. `setPreference()` is guarded by `if (isset(static::$preferences[$key]))`, so writing an *unregistered*
+  key is a **silent no-op** rather than an error; any new preference needs `Extend\User->registerPreference()`.
+- Integration tests: `Flarum\Testing\integration\TestCase::request($method, $path, $options)` accepts only
+  `json`, `authenticatedAs` and `cookiesFrom` — **there is no header option**. Set request headers by chaining
+  on the returned request (`->withHeader('Accept-Language', 'tr')`), and use
+  `requestWithCookiesFrom($request, $previousResponse)` for anything that has to prove once-per-visitor
+  behaviour across two requests.
 - `Flarum\Console\AbstractCommand` — implement `fire()`, use `info()` / `error()`.
 
 ### Admin UI idiom to mirror (`fof/badges` `less/admin.less` + `BadgesPage.tsx`)
@@ -564,12 +618,13 @@ PHP syntax. Structural checks also passed: UTF-8 without BOM, LF endings, no tab
 final newline, balanced braces/parens/brackets, and `! ` spacing per `.styleci.yml`'s
 `logical_not_operators_with_successor_space`.
 
-**Phase 4 — Apply & remember. ← NEXT.** `Middleware/DetectLanguage` inserted before `SetLocale`; guest cookie;
-authenticated users **only when they have no locale**; one-time behaviour. Integration tests, including
-"manual locale never overwritten". §7 already carries the verified pipeline order, core's `SetLocale` source,
-the `Extend\Middleware` `insertBefore` gotcha, and the user-locale rules; §13 risk 6 is now closed, so
-`setLocale()` can be called with `es_MX` / `zh-Hans` unguarded. This is the phase that first references
-project classes from `extend.php`.
+**Phase 4 — Apply & remember. ← NEXT. Full work order in §15.** `Middleware/DetectLanguage` inserted before
+`SetLocale`, plus a `LanguageDetector` that owns the resolution chain; guest cookie; authenticated users
+**only when they have no locale**; one-time behaviour. Integration tests, including "manual locale never
+overwritten". §7 carries the verified pipeline order, core's `SetLocale` source, the `insertBefore` gotcha and
+the user-locale rules — read its 2026-08-24 correction box before designing the cookie, because core never
+writes a `locale` cookie itself. §13 risk 6 is closed, so `setLocale()` can be called with `es_MX` / `zh-Hans`
+unguarded. This is the phase that first references project classes from `extend.php`.
 
 **Phase 5 — Standalone IP lookup.** `IpCountryLookup` (private-IP rejection → edge headers → binary search);
 `scripts/build-ip-data.php`; generate and spot-check `ip4.dat` / `ip6.dat`; `CountryLanguage`. Unit tests
@@ -765,6 +820,178 @@ written and that it is unverified until CI runs. Structural checks that *are* po
 endings, balanced braces, and StyleCI conformance by eye — the `recommended` preset with `align_double_arrow`,
 `multiline_array_trailing_comma`, `new_with_braces` and `blank_line_after_opening_tag` disabled
 (`.styleci.yml`).
+
+Finish by adding a `CHANGELOG.md` line under `## [Unreleased] / ### Added`, then commit per the convention in
+the status header above.
+
+---
+
+## 15. Phase 4 work order — apply & remember (**← START HERE**)
+
+> Self-contained on purpose: a fresh session should be able to build Phase 4 from this section plus the four
+> cross-references below, without re-doing discovery. Every API claim here was read out of
+> `vendor/flarum/core` or `vendor/flarum/testing` at 1.8.19 on 2026-08-24.
+
+**Read first, in this order:** §7 (middleware position, core's `SetLocale` source, **and the correction box** —
+core never writes a `locale` cookie), §6 "Cookies", §10 (the five settings), §14 (the contracts of the two
+Phase 3 classes you are about to consume).
+
+**Goal:** the first phase that changes what a visitor actually sees. A guest arriving with
+`Accept-Language: tr` gets the forum in Turkish if `tr` is installed; the decision is made **once** and
+remembered; a visitor who has already chosen a language is never touched.
+
+### Scope discipline — what Phase 4 must NOT touch
+
+- **No IP lookup.** `IpCountryLookup`, `CountryLanguage`, `resources/ip4.dat`/`ip6.dat` and
+  `scripts/build-ip-data.php` are all Phase 5. Consequence: the `detection_order` setting is **unobservable in
+  Phase 4** — both values behave identically, because only one of the two sources exists. Do not write a test
+  asserting `ip_browser` differs from `browser_ip`; do leave the seam described below so Phase 5 is an
+  insertion rather than a rewrite.
+- **No analytics, no database writes, no bot detection.** Phase 6 owns `language_detection_stats`,
+  `Analytics`, `BotDetector` and the `flarum_language_detection_day` cookie. Phase 4 writes exactly one cookie
+  (the locale memo) and, for a user with no locale preference, one `users.preferences` update.
+- **No admin UI, no new `locale/*.yml` keys.** Phase 8. Phase 4 adds no user-visible text at all, so it needs
+  no translations — which is also why it cannot violate the "no hardcoded visible strings" rule.
+- **No forum JS bundle.** Phase 2 deleted it deliberately (§12 Phase 2 decision 1); everything here is
+  server-side. Do not re-add `js/forum.ts`.
+- **Do not change `BrowserLanguageParser` or `LocaleMatcher`.** §14 is their specification and Phases 5–7
+  depend on those contracts. If Phase 4 seems to need a change there, that is a signal the logic belongs in
+  the new code instead.
+
+### Deliverables
+
+```
+src/LanguageDetector.php
+src/Middleware/DetectLanguage.php
+extend.php                            (add the Extend\Middleware block — the first project class referenced)
+tests/unit/LanguageDetectorTest.php
+tests/integration/DetectionTest.php
+CHANGELOG.md
+```
+
+Namespaces `HuseyinFiliz\LanguageDetection\` and `HuseyinFiliz\LanguageDetection\Middleware\`; tests in
+`HuseyinFiliz\LanguageDetection\Tests\Unit\` / `…\Tests\Integration\` (see §2 for the lowercase-directory
+caveat). No other file changes.
+
+### `LanguageDetector` — the resolution chain, testable without HTTP
+
+Splitting this out of the middleware is what keeps the ordering rules unit-testable and gives Phase 5 one
+obvious place to add IP detection.
+
+```php
+public function __construct(
+    BrowserLanguageParser $parser,
+    LocaleMatcher $matcher,
+    SettingsRepositoryInterface $settings
+) {}
+
+/** @return string|null an exact installed locale key, or null to leave the locale alone */
+public function detect(ServerRequestInterface $request): ?string;
+```
+
+1. Read the header with `$request->getHeaderLine('Accept-Language')`. Laminas returns `''` for an absent
+   header (verified in `MessageTrait::getHeaderLine()`), and `parse('')` already returns `[]`, so no null check
+   is needed — pass it straight through.
+2. `$this->matcher->match($this->parser->parse($header))`. A non-null result is already an exact
+   `getLocales()` key, so **no further validation is required or wanted** — the matcher is the validator, and
+   re-checking with `hasLocale()` would only hide a regression.
+3. On `null`, fall back to the `huseyinfiliz-language-detection.default_locale` setting when it is non-empty
+   **and** `hasLocale()` accepts it. (§10: empty string means "use the forum default", i.e. return `null` and
+   let core do nothing.) This needs `LocaleManager` too — inject it, or keep the fallback in the middleware;
+   either is fine, but decide once and say so in the commit message.
+4. Otherwise `null`. **Never substitute `en`** — see the §3 correction box; `en` is not guaranteed installed.
+
+**Phase 5 seam:** read `detection_order` here and structure step 2 as an ordered list of sources rather than a
+straight-line call, so Phase 5 adds a second source instead of restructuring. Keep it honest — a one-element
+list is fine; do not build a driver registry for it.
+
+`SettingsRepositoryInterface` has exactly four methods (`all`, `get`, `set`, `delete`), so a ~10-line in-test
+fake is preferable to a Mockery double, matching the Phase 3 decision to use a real `LocaleManager`. Note there
+is **no `MemorySettingsRepository` in core 1.8** — do not reach for one.
+
+### `Middleware/DetectLanguage`
+
+Implements `Psr\Http\Server\MiddlewareInterface`. Registered as:
+
+```php
+(new Extend\Middleware('forum'))
+    ->insertBefore(\Flarum\Http\Middleware\SetLocale::class, Middleware\DetectLanguage::class),
+```
+
+Middleware are resolved with `$container->make($middleware)` (`Forum\ForumServiceProvider:96`), so plain
+constructor injection of `LocaleManager`, `LanguageDetector` and `CookieFactory` works with no binding.
+
+Flow, in order — every branch must `return $handler->handle($request)`:
+
+1. **`GET` only.** `if ($request->getMethod() !== 'GET') { … }`. The forum stack also carries form POSTs;
+   detection has no business there.
+2. **Authenticated actor** (`RequestUtil::getActor($request)`, `$actor->exists`):
+   - `$actor->getPreference('locale')` is non-null → **do nothing at all.** No cookie, no write, no
+     `setLocale()`. This is the critical rule (§7, spec §15) and deserves its own named test.
+   - Otherwise detect; on a hit, `$actor->setPreference('locale', $detected)` + `$actor->save()`, and
+     `$this->locales->setLocale($detected)` so *this* request is already translated.
+3. **Guest:** read our own cookie —
+   `Arr::get($request->getCookieParams(), $this->cookies->getName('language_detection_locale'))`. Present and
+   `hasLocale()` → `setLocale()` and stop; detection does not run again. This is the "at most once per
+   visitor" rule from §6.
+4. **Guest, no cookie:** detect. On `null`, do nothing (core's default locale stands). On a hit,
+   `setLocale($detected)`, then set the cookie **on the response**:
+   `FigResponseCookies::set($response, $this->cookies->make('language_detection_locale', $detected, 60 * 60 * 24 * 365))`.
+   Cookie name on the wire is `flarum_language_detection_locale` (§6); `CookieFactory` supplies prefix, path,
+   domain, secure and HttpOnly.
+
+`setLocale()` needs no input guard — §13 risk 6 is closed: Symfony's `assertValidLocale()` is
+`preg_match('/^[a-z0-9@_\.\-]*$/i', …)`, so `es_MX` and `zh-Hans` pass.
+
+**Why this ordering is safe:** core's `SetLocale` runs immediately after us and, per §7, only overrides when an
+explicit signal exists (`getPreference('locale')` for users, an unprefixed `locale` cookie for guests). For a
+user we only ever write the preference when it was empty, so we can never lose a manual choice; for a guest
+core finds no cookie of its own and leaves our value alone, then propagates it via
+`withAttribute('locale', $this->locales->getLocale())`. A third-party language switcher that *does* write an
+unprefixed `locale` cookie still wins over us, for free.
+
+### Tests
+
+**Unit (`LanguageDetectorTest`)** — a `ServerRequest` with a header plus the settings fake: `tr` header on a
+forum with `tr` installed → `tr`; unmatched header with `default_locale = tr` → `tr`; unmatched header with
+`default_locale = ''` → `null`; `default_locale` set to a *not installed* code → `null`; no header at all →
+falls through the same path as an unmatched one.
+
+**Integration (`DetectionTest`)** — extends `Flarum\Testing\integration\TestCase`, and in `setUp()`:
+`$this->extension('huseyinfiliz-language-detection')` (the ID is the composer name with `/` → `-`). Two
+verified traps, both of which will silently produce a passing-but-meaningless test if ignored:
+
+- **`request()` has no header option.** Its `$options` are only `json`, `authenticatedAs` and `cookiesFrom`.
+  Set the header by chaining: `$this->request('GET', '/')->withHeader('Accept-Language', 'tr')`.
+- **`authenticatedAs` and `cookiesFrom` cannot be combined in one `request()` call.** `authenticatedAs` →
+  `requestAsUser()`, which authenticates via the **`flarum_remember` cookie** (it inserts a `session_remember`
+  access token and calls `withCookieParams([...])`) — *not* an `Authorization` header, despite what the
+  docblock on `request()` says. `cookiesFrom` is applied afterwards and calls `withCookieParams()` again,
+  **replacing** the array, so the remember cookie is dropped and the "user" is silently a guest. For a
+  two-request authenticated scenario, merge by hand:
+  `$req->withCookieParams(array_merge($req->getCookieParams(), $cookiesFromPrevious))`.
+
+  The upside of cookie-based auth: `RememberFromCookie` → `AuthenticateWithSession` both run *before*
+  `SetLocale`, so the actor genuinely is resolved by the time our middleware sees the request on a plain forum
+  `GET`. (The forum stack has no `AuthenticateWithHeader` — that is API-only.)
+
+Cases to cover: guest sends `tr` on a forum with Turkish installed → response is Turkish and carries
+`Set-Cookie: flarum_language_detection_locale=tr`; second request via `cookiesFrom` → still Turkish and
+detection did not re-run; guest sends an uninstalled language → forum default, and (Phase 6 will assert the
+stats row, not this phase). **A user with `locale` already set is never overwritten** — assert the preference
+value is unchanged *and* that the response is in their chosen language, not the header's. A user with no
+preference gets one written. Seed users with `prepareDatabase(['users' => [...]])`; seed settings with
+`prepareDatabase(['settings' => [['key' => …, 'value' => …]]])` (`populateDatabase()` special-cases the
+`settings` table to upsert on `key`).
+
+### Verification available in this environment
+
+Unchanged from §14 and still binding: **there is no PHP here**, so nothing can be executed — no phpunit, no
+`php -l`. CI (`.github/workflows/backend.yml`, `enable_backend_testing: true`) is the only gate. **Never state
+or imply that the tests pass.** Report what was written and that it is unverified until CI runs. Integration
+tests additionally need MySQL, so they will not run anywhere but CI regardless. Structural checks that *are*
+possible: UTF-8 without BOM, LF endings, no tabs, no trailing whitespace, final newline, balanced
+braces/parens, `! ` spacing, and StyleCI conformance by eye against `.styleci.yml`.
 
 Finish by adding a `CHANGELOG.md` line under `## [Unreleased] / ### Added`, then commit per the convention in
 the status header above.
