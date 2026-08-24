@@ -12,6 +12,7 @@
 namespace HuseyinFiliz\LanguageDetection;
 
 use Flarum\Extend;
+use Flarum\Http\Middleware\SetLocale;
 
 return [
     (new Extend\Frontend('admin'))
@@ -19,6 +20,12 @@ return [
         ->css(__DIR__.'/less/admin.less'),
 
     new Extend\Locales(__DIR__.'/locale'),
+
+    // Detection has to happen after the actor is known and before core decides the
+    // locale, and this is the only position that satisfies both. Running after
+    // `SetLocale` would mean overwriting a choice the visitor had already made.
+    (new Extend\Middleware('forum'))
+        ->insertBefore(SetLocale::class, Middleware\DetectLanguage::class),
 
     (new Extend\Settings())
         ->default('huseyinfiliz-language-detection.detection_order', 'browser_ip')

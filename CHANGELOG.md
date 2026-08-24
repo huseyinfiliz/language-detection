@@ -15,3 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Browser language detection: an `Accept-Language` parser that honours quality values,
   and a matcher that resolves the requested tags to an installed Flarum locale by exact
   match, progressive subtag truncation, or an unambiguous regional variant.
+- Automatic language selection: a forum middleware that applies the detected locale to
+  page views, remembering it in a cookie for guests and in the `locale` preference for
+  signed-in members. A visitor who has already chosen a language is never overridden, and
+  a language that is not installed is never applied.
