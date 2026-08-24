@@ -1,15 +1,17 @@
 # Handoff — `huseyinfiliz/language-detection` (Flarum 1.x)
 
-> **Status: Phases 1–3 are complete. Phase 4 (apply & remember) is next — its full work order is §15;
-> start there.** §7 carries the middleware position, core's `SetLocale` source and the user-locale rules,
-> including a correction box added on 2026-08-24 that Phase 4 must read.
+> **Status: Phases 1–4 are complete. Phase 5 (standalone IP lookup) is next — its full work order is §16;
+> start there.** §3 carries the dataset design and the resolution order Phase 5 implements; §15 is now the
+> specification of the middleware Phase 5 plugs a second source into.
 > This file exists so a fresh session can resume without re-doing discovery.
 > It is a working document — remove it (or gitignore it) before release.
 >
-> **Repository state, 2026-08-24:** branch `1.x`, pushed to `origin/1.x`.
-> Phase 3 (`702995c`) adds `src/BrowserLanguageParser.php`, `src/LocaleMatcher.php` and their two unit tests.
-> `extend.php` still references no project classes, by design (§14) — Phase 4 is the first phase that
-> wires anything up.
+> **Repository state, 2026-08-24:** branch `1.x`, pushed to `origin/1.x` through Phase 3 (`702995c`);
+> Phase 4 (`cb43798`) is committed locally and still needs pushing.
+> Phase 4 adds `src/LanguageDetector.php`, `src/Middleware/DetectLanguage.php`,
+> `tests/unit/LanguageDetectorTest.php` and `tests/integration/DetectionTest.php`, and is the first phase that
+> references project classes from `extend.php` — so it is also the first time CI exercises the migration and
+> the extension actually booting.
 >
 > **Commit convention (standing instruction from the project owner):** author **and** committer are
 > `Hüseyin Filiz <mysuperuser01@gmail.com>`; never add a `Co-Authored-By: Claude … <noreply@anthropic.com>`
@@ -96,13 +98,14 @@ Important: the published `title` fields are **inconsistent** — a mix of Englis
 (`Turkish`, but `日本語`, `Русский`, `Български`, `Italiano`), and one is lowercase (`hindi`). **Do not reuse
 them verbatim.** The extension must ship its own curated English + native names.
 
-### Test infrastructure (scaffolded and committed; unit tests written in Phase 3)
+### Test infrastructure (unit tests from Phases 3–4; the first integration test landed in Phase 4)
 
 | Path | Notes |
 |---|---|
 | `tests/phpunit.unit.xml` | suite is `./unit`, suffix `Test.php`; registers Mockery's `TestListener`, so **Mockery is available**. Needs no `bootstrap` attribute — it is byte-for-byte flarum/testing's own unit config, and `vendor/bin/phpunit` loads the autoloader itself |
-| `tests/phpunit.integration.xml` + `tests/integration/setup.php` | integration suite; needs a real database (`composer test:setup`, run once), so it effectively only runs in CI |
-| `tests/unit/BrowserLanguageParserTest.php`, `tests/unit/LocaleMatcherTest.php` | Phase 3; base class `Flarum\Testing\unit\TestCase` (lowercase `unit` namespace segment, as the vendored class declares it) |
+| `tests/phpunit.integration.xml` + `tests/integration/setup.php` | integration suite; needs a real database (`composer test:setup`, run once), so it effectively only runs in CI. `processIsolation="true"`, so each test method gets a fresh process and no singleton leaks between methods |
+| `tests/unit/BrowserLanguageParserTest.php`, `tests/unit/LocaleMatcherTest.php`, `tests/unit/LanguageDetectorTest.php` | Phases 3–4; base class `Flarum\Testing\unit\TestCase` (lowercase `unit` namespace segment, as the vendored class declares it) |
+| `tests/integration/DetectionTest.php` | Phase 4; base class `Flarum\Testing\integration\TestCase`, which defines only `tearDown()` — `parent::setUp()` resolves to PHPUnit's own empty one |
 | `tests/fixtures/.gitkeep` | still an empty placeholder — Phase 5's synthetic `.dat` fixtures land here. `tests/unit/.gitkeep` was removed once real tests existed |
 
 `composer.json` has `require-dev: flarum/testing ^1.0.0` and maps `autoload-dev` PSR-4
@@ -113,7 +116,9 @@ them verbatim.** The extension must ship its own curated English + native names.
 `huseyinfiliz/awards` do exactly this; it works because PHPUnit `require`s each discovered file directly, so
 PSR-4 is never asked to resolve the class. **Consequence:** a shared helper or fixture *class* placed in
 `tests/unit/` would fail to autoload on case-sensitive Linux CI. Keep test classes self-contained, or put
-shared fixtures in `tests/fixtures/` and require them explicitly.
+shared fixtures in `tests/fixtures/` and require them explicitly. Phase 4 took the first route: its
+`SettingsStub` is declared in `tests/unit/LanguageDetectorTest.php` itself, which loads because PHPUnit
+`require`s the whole file.
 
 ### Two git failure modes in this repo
 
@@ -618,17 +623,55 @@ PHP syntax. Structural checks also passed: UTF-8 without BOM, LF endings, no tab
 final newline, balanced braces/parens/brackets, and `! ` spacing per `.styleci.yml`'s
 `logical_not_operators_with_successor_space`.
 
-**Phase 4 — Apply & remember. ← NEXT. Full work order in §15.** `Middleware/DetectLanguage` inserted before
-`SetLocale`, plus a `LanguageDetector` that owns the resolution chain; guest cookie; authenticated users
-**only when they have no locale**; one-time behaviour. Integration tests, including "manual locale never
-overwritten". §7 carries the verified pipeline order, core's `SetLocale` source, the `insertBefore` gotcha and
-the user-locale rules — read its 2026-08-24 correction box before designing the cookie, because core never
-writes a `locale` cookie itself. §13 risk 6 is closed, so `setLocale()` can be called with `es_MX` / `zh-Hans`
-unguarded. This is the phase that first references project classes from `extend.php`.
+**Phase 4 — Apply & remember. ✅ DONE.** Work order in §15, followed as written.
+Built: `src/LanguageDetector.php`, `src/Middleware/DetectLanguage.php`,
+`tests/unit/LanguageDetectorTest.php` (9 tests), `tests/integration/DetectionTest.php` (7 tests), plus the
+`Extend\Middleware` block in `extend.php` — the first project class this extension registers, so this is also
+the first commit where CI boots the extension and runs the migration.
 
-**Phase 5 — Standalone IP lookup.** `IpCountryLookup` (private-IP rejection → edge headers → binary search);
-`scripts/build-ip-data.php`; generate and spot-check `ip4.dat` / `ip6.dat`; `CountryLanguage`. Unit tests
-with a small synthetic `.dat` fixture rather than the shipped 2.3 MB files.
+Decisions taken during Phase 4:
+
+1. **`LocaleManager` is injected into `LanguageDetector`** as a fourth constructor argument, so the
+   `default_locale` fallback lives with the rest of the chain instead of in the middleware. §15 allowed either;
+   this keeps the whole of "what locale should this request use" in one class that needs no HTTP and no
+   container to test.
+2. **The Phase 5 seam is an ordered list intersected with a `SOURCES` constant** — `SOURCE_BROWSER` and
+   `SOURCE_IP` exist as constants, `SOURCES` lists only the browser, and `array_intersect` (which preserves its
+   first argument's order) filters the `detection_order` preference down to what is implemented. Phase 5 adds
+   `SOURCE_IP` to `SOURCES` and one branch to `fromSource()`. No driver registry, per §15.
+3. **The guest memo is validated on read, not just on write.** A cookie value that is not in `getLocales()` is
+   discarded and detection re-runs. That covers a tampered cookie and a language pack removed since the memo
+   was written, and it is the reason an arbitrary cookie value can never reach `setLocale()`.
+4. **A `null` detection writes nothing** — no cookie for a guest, no preference for a user. So a visitor whose
+   language is installed *later* is picked up on their next page view, instead of being permanently remembered
+   as "undetectable".
+5. **The integration test registers its locales on the `LocaleManager` singleton** rather than through
+   `Extend\LanguagePack`, which needs a real installed `Extension` instance and so is unusable in tests. The
+   test forum registers only its `default_locale`, and the added locales carry no translations, so every
+   assertion is on the rendered `<html lang>` attribute (`Frontend\Content\Meta` sets `$document->language`
+   from `LocaleManager::getLocale()`; `views/frontend/app.blade.php` renders it) rather than on translated
+   text.
+6. **Two requests in one integration test cannot both be trusted for `lang`.** `LocaleManager` is a container
+   singleton and nothing resets the translator between `send()` calls, so a second response's `lang` reads `tr`
+   even if the middleware did nothing. The round-trip test therefore asserts on the **absent second
+   `Set-Cookie`** — which is what actually proves the cookie is read back under the name it was written with —
+   and a separate test applies a memo from a clean start with no `Accept-Language` at all.
+7. **No POST/GET-guard test.** The `GET` guard is real and worth keeping, but it cannot be observed from the
+   integration harness: `CheckCsrfToken` sits *inside* our middleware and throws before the handler returns, so
+   no cookie appears on a POST whether the guard exists or not. A test that cannot fail was not written.
+
+**Verification actually performed:** the PHP was **not executed** — there is still no PHP in this environment,
+so both test files are **unverified until CI runs**, and the integration suite additionally needs MySQL. What
+was done: every API the new code touches was re-read in `vendor/` (`SetLocale`, `CookieFactory`,
+`RequestUtil`, `User::getPreference`/`setPreference`, `Extend\Middleware`, `SettingsRepositoryInterface`,
+`Frontend\FrontendServiceProvider:60`, `app.blade.php`, and the whole of `flarum/testing`'s integration
+`TestCase` / `BuildsHttpRequests` / `RetrievesAuthorizedUsers`), and the structural checks from §15 all pass:
+UTF-8 without BOM, LF endings, no tabs, no trailing whitespace, final newline, balanced braces/parens, `! `
+spacing, alphabetical imports.
+
+**Phase 5 — Standalone IP lookup. ← NEXT. Full work order in §16.** `IpCountryLookup` (private-IP rejection →
+edge headers → binary search); `scripts/build-ip-data.php`; generate and spot-check `ip4.dat` / `ip6.dat`;
+`CountryLanguage`. Unit tests with a small synthetic `.dat` fixture rather than the shipped 2.3 MB files.
 
 **Phase 6 — Analytics.** Atomic daily upsert, request counting, cookie-date unique counting, country codes,
 bot filtering, `enable_analytics` honoured. Tests including bot exclusion and analytics-disabled.
@@ -826,15 +869,18 @@ the status header above.
 
 ---
 
-## 15. Phase 4 work order — apply & remember (**← START HERE**)
+## 15. Phase 4 work order — ✅ implemented, kept as the middleware's specification
 
-> Self-contained on purpose: a fresh session should be able to build Phase 4 from this section plus the four
-> cross-references below, without re-doing discovery. Every API claim here was read out of
-> `vendor/flarum/core` or `vendor/flarum/testing` at 1.8.19 on 2026-08-24.
+> **Phase 4 is done** (§12 records what was built, the seven decisions taken, and exactly what was and was not
+> verified). This section is retained because it is still the authoritative statement of the resolution chain
+> and the middleware's branch-by-branch behaviour — Phase 10's review should check the code against it, and
+> Phase 5 plugs a second detection source into the `LanguageDetector` described here without breaking these
+> contracts. Do not re-implement it. Every API claim was read out of `vendor/flarum/core` or
+> `vendor/flarum/testing` at 1.8.19 on 2026-08-24.
 
-**Read first, in this order:** §7 (middleware position, core's `SetLocale` source, **and the correction box** —
+**Background, in this order:** §7 (middleware position, core's `SetLocale` source, **and the correction box** —
 core never writes a `locale` cookie), §6 "Cookies", §10 (the five settings), §14 (the contracts of the two
-Phase 3 classes you are about to consume).
+Phase 3 classes this consumes).
 
 **Goal:** the first phase that changes what a visitor actually sees. A guest arriving with
 `Accept-Language: tr` gets the forum in Turkish if `tr` is installed; the decision is made **once** and
@@ -882,7 +928,8 @@ obvious place to add IP detection.
 public function __construct(
     BrowserLanguageParser $parser,
     LocaleMatcher $matcher,
-    SettingsRepositoryInterface $settings
+    SettingsRepositoryInterface $settings,
+    LocaleManager $locales           // as built — see step 3 and §12 Phase 4 decision 1
 ) {}
 
 /** @return string|null an exact installed locale key, or null to leave the locale alone */
@@ -995,3 +1042,187 @@ braces/parens, `! ` spacing, and StyleCI conformance by eye against `.styleci.ym
 
 Finish by adding a `CHANGELOG.md` line under `## [Unreleased] / ### Added`, then commit per the convention in
 the status header above.
+
+---
+
+## 16. Phase 5 work order — standalone IP lookup (**← START HERE**)
+
+> Self-contained on purpose: a fresh session should be able to build Phase 5 from this section plus the
+> cross-references below, without re-doing discovery. API claims marked *verified* were read out of
+> `vendor/flarum/core` or `vendor/flarum/testing` at 1.8.19; everything about the dataset is design, and Phase 5
+> is the phase that first proves it.
+
+**Read first, in this order:** §3 in full (why `fof/geoip` is out, the resolution order, the binary dataset
+design, the country→language map **and** the `en` correction box), §15 (the `LanguageDetector` seam this plugs
+into and the middleware it feeds), §10 (`detection_order`), §2 (no PHP here; `curl`, `perl`, `awk`, `od`, `xxd`
+are available), §13 risk 1 (the generator stays unverified until someone runs it under real PHP).
+
+**Goal:** a second detection source. A guest with no useful `Accept-Language` — or one whose forum is
+configured `ip_browser` — gets their country's language, resolved through the *same* `LocaleMatcher` as the
+browser source. This is also the phase that makes `detection_order` observable for the first time.
+
+### Scope discipline — what Phase 5 must NOT touch
+
+- **No analytics.** Phase 6 owns `language_detection_stats`, the `country_code` column, `Analytics`,
+  `BotDetector` and the `flarum_language_detection_day` cookie. Phase 5 produces a country code; it does not
+  count anything.
+- **No admin UI.** Phase 8. `locale/en.yml` already carries `admin.ip_data.notice` (with a `{date}`
+  placeholder) and `admin.ip_data.notice_unavailable` — Phase 5 must make both *answerable* (see the metadata
+  sidecar below) but must not build the notice, and must not add locale keys.
+- **No external calls at runtime**, no API keys, no `fof/geoip`, no downloads outside
+  `scripts/build-ip-data.php`. §3 is emphatic and the spec's "no expensive operations on every page request"
+  still binds — detection already runs at most once per visitor (§6), and the lookup itself is ~18 `fseek`s.
+- **Do not change `BrowserLanguageParser`, `LocaleMatcher`, or `DetectLanguage`.** §14 and §15 are their
+  specifications. The only edit outside new files is the two-line seam in `LanguageDetector` described below.
+  If IP detection seems to need a matcher change, that is a signal the logic belongs in `CountryLanguage`.
+- **Never store the IP.** It is read from the request, used, and dropped — not logged, not cached, not written
+  to any table. §1, and the privacy promise `enable_analytics_help` already makes to admins.
+
+### Deliverables
+
+```
+src/IpCountryLookup.php
+src/CountryLanguage.php
+src/LanguageDetector.php               (edit: SOURCES gains SOURCE_IP; fromSource() gains one branch)
+scripts/build-ip-data.php              (maintainer-facing, committed, never invoked at runtime)
+resources/ip4.dat                      (~1.4 MB, generated)
+resources/ip6.dat                      (~0.9 MB, generated)
+resources/ip-data.php                  (generated sidecar: build date + record counts)
+tests/unit/IpCountryLookupTest.php
+tests/unit/CountryLanguageTest.php
+tests/fixtures/ip4-test.dat            (a few hand-built records, not the shipped files)
+tests/fixtures/ip6-test.dat
+tests/integration/DetectionTest.php    (edit: the edge-header path, and the first real detection_order test)
+CHANGELOG.md
+```
+
+### `IpCountryLookup`
+
+```php
+public function countryFor(?string $ip, ServerRequestInterface $request): ?string;   // 'TR', or null
+```
+
+Whether the request arrives as a second argument or the class reads the IP off it itself is a judgement call —
+decide once and say so in the commit message. The pieces it needs:
+
+- **The IP.** `$request->getAttribute('ipAddress')`, set by core's `Http\Middleware\ProcessIp` from
+  `REMOTE_ADDR`, defaulting to `127.0.0.1` (*verified* — `vendor/flarum/core/src/Http/Middleware/ProcessIp.php`,
+  registered in `InstalledApp`'s outer middleware per §9, so it runs long before the forum stack and the
+  attribute is always present). **Flarum 1.x does not honour `X-Forwarded-For`** — `ProcessIp` reads
+  `REMOTE_ADDR` and nothing else — so behind a reverse proxy the address may be the proxy's. That is exactly
+  why the edge headers below come *first* rather than as a fallback, and it is worth a comment in the code.
+- **Reject non-public addresses** before anything else:
+  `filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)` covers empty,
+  malformed, loopback, private and reserved in one call. `127.0.0.1` — ProcessIp's own default — falls out
+  here, which is what turns a CLI or misconfigured request into a clean `null` instead of a lookup.
+- **Trusted edge/server headers** (§3): `CF-IPCountry`, `CloudFront-Viewer-Country`, `X-Vercel-IP-Country`,
+  `Fastly-Geo-Country`, `X-AppEngine-Country` via `getHeaderLine()`, plus `GEOIP_COUNTRY_CODE` and
+  `MM_COUNTRY_CODE` from `getServerParams()`. Validate with `/^[A-Z]{2}$/` and treat `XX`, `T1`, `ZZ` as
+  unknown. Free, and more accurate than any bundled DB. Spoofable, but the only consequence is which UI
+  language is offered — a visitor can already send any `Accept-Language` they like — so document it and move on.
+- **The bundled dataset**, last.
+
+**Binary search — the one real trap.** IPv6 records key on the top 64 bits (§3), and PHP's integers are
+*signed*, so `unpack('J', …)` on any address at or above `8000::` yields a negative number and the search
+silently inverts. Do not convert to integers: compare the raw big-endian bytes with `strcmp()`. Big-endian byte
+order makes byte-wise comparison identical to unsigned numeric comparison, so
+`strcmp($candidateKey, substr(inet_pton($ip), 0, 8)) <= 0` is both correct and shorter than the arithmetic. The
+same approach works unchanged on IPv4's 4-byte keys, which keeps one search routine instead of two.
+
+Everything else follows §3: `fopen('rb')`, `filesize() / RECORD` for the count, binary search taking the
+greatest start ≤ target, `fread(6)` / `fread(10)` per probe, nothing loaded into memory, and `\0\0` meaning
+"unknown" (return `null`, never the literal). **A missing or truncated dataset must return `null`, not warn or
+throw** — the extension has to keep working on browser detection alone, which is precisely the state
+`admin.ip_data.notice_unavailable` describes. Close the handle in a `finally`.
+
+### `resources/ip-data.php` — why a sidecar
+
+`admin.ip_data.notice` promises a build date. Do not derive it from `filemtime()`: git sets mtimes to *checkout*
+time, so the notice would report when the forum was installed and quietly lie to every admin who reads it. §3's
+record layout has no header field by design, so the generator should also write a tiny `resources/ip-data.php`
+returning something like
+`['built' => '2026-08-24', 'ipv4_records' => …, 'ipv6_records' => …, 'source' => 'RIR delegated-extended']`.
+`IpCountryLookup` exposes it (a `datasetInfo(): ?array`, `null` when the files are absent) so Phase 8 can render
+either notice without touching the binary files.
+
+### `CountryLanguage`
+
+```php
+/** @return string[] ordered candidate locale codes, or [] for an unknown country */
+public function candidatesFor(string $countryCode): array;
+```
+
+It loads `resources/countries.php` (246 entries, committed in Phase 2, keys uppercase ISO 3166-1 alpha-2) and
+returns the ordered list **unresolved**. It must not decide what is installed: that list goes straight into
+`LocaleMatcher::match()`, exactly like browser tags, so IP candidates inherit truncation, `CODE_ALIASES` and the
+unambiguous-sibling rule for free and there stays one place where "installed" is decided. Load the file once per
+instance (`require` in the constructor, or a lazy static), not once per call.
+
+### The seam in `LanguageDetector`
+
+Phase 4 left this deliberately small (§12 Phase 4 decision 2). Add `self::SOURCE_IP` to `SOURCES`, add the
+branch to `fromSource()`, and write `fromIp()`:
+
+```php
+$country = $this->ipLookup->countryFor($request->getAttribute('ipAddress'), $request);
+
+return $country === null ? null : $this->matcher->match($this->countryLanguage->candidatesFor($country));
+```
+
+Nothing else changes: `detect()` already walks the sources in the configured order and falls through to
+`default_locale`, and `DetectLanguage` already applies and remembers whatever comes back.
+
+### Generating the `.dat` files
+
+`scripts/build-ip-data.php` is the canonical generator and must be written as if it were the only one: fetch the
+five RIR `delegated-*-extended-latest` files listed in §3, keep `ipv4`/`ipv6` allocation rows, expand the IPv4
+`start + count` form into ranges (counts are **not** always powers of two — split them), sort, **fill every gap
+with a `\0\0` record** so the "start only, no end" layout stays exhaustive, merge adjacent identical countries,
+and write the two files. Since there is no PHP here, produce the initial `.dat` files with an equivalent
+throwaway `perl` script and spot-check known pairs — `8.8.8.8` → `US`, a `212.156.x` → `TR`, an APNIC range →
+`CN`, plus one IPv6 (`2606:4700::` → Cloudflare's registration) and both file edges. Record the spot-check
+results in §12. §13 risk 1 stays open until the committed PHP generator has been run under real PHP and shown to
+produce byte-identical files.
+
+Committing ~2.3 MB of binary data is intended (§3, accepted tradeoff). Do not gzip — `fseek` needs it raw.
+
+### Tests
+
+**Unit.** Build `tests/fixtures/ip4-test.dat` and `ip6-test.dat` from a handful of hand-computed records so the
+expected answers are obvious, and point the lookup at them (a constructor argument for the resources directory
+is the cheapest way; whatever you choose, do not let tests depend on the 2.3 MB shipped files). Cover: an
+address below the first record, an exact range start, an address inside a range, the last record, an address in a
+`\0\0` gap, a private address, `127.0.0.1`, a malformed string, and each edge header — including the `XX`/`T1`
+rejection and a header on a request whose IP is private (the header still wins, since it is the edge's own
+verdict). For `CountryLanguage`: a known country, an unknown one, and the `CA => ['en', 'fr']` ordering rule from
+§3, which exists so majority-English countries are not forced to a minority language.
+
+Fixtures live in `tests/fixtures/` and must be opened by path — a *class* there would not autoload (§2; note
+`tests/fixtures/.gitkeep` can go once real fixtures land).
+
+**Integration** — two cases in `DetectionTest`, both cheap because neither needs the dataset:
+
+1. A guest with `CF-IPCountry: TR` and no `Accept-Language` is served Turkish. The first end-to-end proof of the
+   IP path.
+2. The same request with **both** `CF-IPCountry: TR` and `Accept-Language: de`, run under
+   `$this->setting('huseyinfiliz-language-detection.detection_order', 'ip_browser')` — Turkish wins — and again
+   under `browser_ip` — German wins. `setting()` applies **before boot** (*verified* —
+   `Flarum\Testing\integration\TestCase::setting()` feeds `SetSettingsBeforeBoot`), unlike
+   `prepareDatabase(['settings' => …])`, so it must be called before anything touches `app()`. This is the test
+   Phase 4 could not write, and it is worth writing carefully: it is the only assertion that `detection_order`
+   does anything at all.
+
+Reuse Phase 4's setup verbatim — `addLocale()` on the `LocaleManager` singleton, assertions on the rendered
+`<html lang>` — and re-read §12 Phase 4 decision 6 before adding a second `send()` to any one test.
+
+### Verification available in this environment
+
+Unchanged and still binding: **there is no PHP here**, so nothing can be executed — no phpunit, no `php -l`. CI
+is the only gate. **Never state or imply that the tests pass.** Report what was written and that it is
+unverified until CI runs. Phase 5 does have one check the earlier phases lacked: the generated `.dat` files can
+be inspected byte by byte with `od`/`xxd`, and the spot-checks above are real evidence about the *data* — say
+plainly that they say nothing about the PHP.
+
+Finish by adding a `CHANGELOG.md` line under `## [Unreleased] / ### Added`, then commit per the convention in
+the status header above. Close Phase 5 out the way every phase closes: record what was built and decided in
+§12, and write the Phase 6 work order as §17.
