@@ -1,14 +1,15 @@
 # Handoff — `huseyinfiliz/language-detection` (Flarum 1.x)
 
-> **Status: Phase 1 (investigation) and Phase 2 (skeleton & initial setup) are complete. Phase 3 is next —
-> the full work order is §14. Start there.**
+> **Status: Phases 1–3 are complete. Phase 4 (apply & remember) is next — see §7, which already
+> documents the middleware position and the user-locale rules it has to honour, plus the Phase 4
+> paragraph in §12.**
 > This file exists so a fresh session can resume without re-doing discovery.
 > It is a working document — remove it (or gitignore it) before release.
 >
-> **Repository state, 2026-08-24:** branch `1.x`, working tree clean, in sync with `origin/1.x`.
-> Commit `11077ea` *"Phase 2: skeleton, settings, migration, and bundled catalogs"* (17 files, +1184/−32) is
-> pushed, on top of `5bed04d Initial release`. Everything this document describes as built is committed —
-> nothing is untracked.
+> **Repository state, 2026-08-24:** branch `1.x`, in sync with `origin/1.x` as of commit `cd52701`.
+> Phase 3 adds `src/BrowserLanguageParser.php`, `src/LocaleMatcher.php` and their two unit tests.
+> `extend.php` still references no project classes, by design (§14) — Phase 4 is the first phase that
+> wires anything up.
 >
 > **Commit convention (standing instruction from the project owner):** author **and** committer are
 > `Hüseyin Filiz <mysuperuser01@gmail.com>`; never add a `Co-Authored-By: Claude … <noreply@anthropic.com>`
@@ -74,6 +75,12 @@ Consequences:
 > All of the above were **verified still present on 2026-08-24**. They live in temp directories, so re-clone
 > if a later session finds them gone; the Flarum core checkout is the one Phase 3 actually needs.
 > Note the core checkout is **sparse and has no `vendor/`** — Symfony/Illuminate source cannot be read from it.
+>
+> **Superseded on 2026-08-24 (Phase 3):** the `flarum-core` temp checkout is **gone**, but it no longer
+> matters — the repo now has a full `vendor/` (gitignored, present on disk), so `vendor/flarum/core/src/`,
+> `vendor/symfony/translation/`, `vendor/flarum/testing/` and `vendor/phpunit/phpunit` (locked at **9.6.36**)
+> are all readable in place. Prefer `vendor/` over re-cloning; it also carries the Symfony/Illuminate source the
+> sparse checkout lacked. `/tmp/fof-badges` and `/tmp/langpacks/*` were not re-checked this session.
 >
 > `Read` fails on `/tmp/...` paths; resolve with `pwd -W` and use the `C:/Users/...` form.
 > `raw.githubusercontent.com` returns **405** via WebFetch — clone with git, or fetch `github.com` HTML /
@@ -517,14 +524,52 @@ Decisions taken during Phase 2 — all deliberate, all reversible:
    than invented. The mandatory privacy/features prose is Phase 10's job, per §12 — writing it now would
    document behaviour that does not exist yet.
 
-**Phase 3 — Browser detection. ← NEXT. Full work order in §14; read that instead of this paragraph.**
-`BrowserLanguageParser` (q-values, ordering, region subtags, malformed and empty input) + `LocaleMatcher`
-(exact → progressive truncation → unambiguous sibling → none) + unit tests. Read the §3 correction box first:
-`en` is **not** a guaranteed fallback.
+**Phase 3 — Browser detection. ✅ DONE.** Work order in §14, followed as written.
+Built: `src/BrowserLanguageParser.php`, `src/LocaleMatcher.php`,
+`tests/unit/BrowserLanguageParserTest.php` (31 header cases + 5 dedicated tests),
+`tests/unit/LocaleMatcherTest.php` (21 candidate cases + 6 dedicated tests). Nothing else changed except
+`CHANGELOG.md` and this file; `extend.php` deliberately still references no project classes.
 
-**Phase 4 — Apply & remember.** `Middleware/DetectLanguage` inserted before `SetLocale`; guest cookie;
+Decisions taken during Phase 3:
+
+1. **The optional macrolanguage map was included.** §14 left `['no' => ['nb','nn'], 'ku' => ['ckb','kmr']]`
+   as a take-it-or-leave-it improvement. Taken, because real browsers send a bare `no` and without it the
+   Phase 7 missing-languages report would list `no` as a missing language on a forum that has Norwegian
+   installed — a visibly wrong signal to an admin, not just a missed match. It feeds tier 3's existing
+   "exactly one installed" rule rather than adding a mechanism, so `no` still declines when both Bokmål and
+   Nynorsk are present, exactly as `sr` declines between `sr-Cyrl` and `sr-Latn`.
+2. **The output cap is applied after sorting and deduplication, not before parsing.** §14 says to cap "the
+   output at ~10 tags before doing any work", but capping the *element list* first would be wrong: nothing
+   requires a client to list its highest-q tag first, so an early cut could discard the most-preferred tag.
+   The 1024-byte input cap already bounds the work (≈340 elements worst case), so `MAX_TAGS` is applied last.
+3. **An over-long header is cut back to whole elements.** A blind `substr` to 1024 bytes can land mid-element
+   and turn `de-DE` into a plausible-looking but invented `de-D`, which would then pass shape validation. The
+   parser drops everything after the last comma in the truncated string; if there is no comma, it returns `[]`.
+4. **`CODE_ALIASES` is applied to the language subtag, not the whole code**, so a client sending `uzb-UZ`
+   normalizes to `uz-uz` and still reaches installed `uzb` by truncation.
+5. **Tests use a real `LocaleManager`, not a Mockery double** — `new LocaleManager(new Translator('en'))` plus
+   `addLocale()` calls, per §9. Base class is `Flarum\Testing\unit\TestCase` (note the lowercase `unit`
+   namespace segment, which is how the vendored class actually declares itself). Providers are `static`, and
+   PHPUnit is locked at 9.6.36, so `@dataProvider` annotations are correct and attributes are not available.
+6. **`tests/phpunit.unit.xml` needs no `bootstrap` attribute.** It is byte-for-byte the same config
+   `flarum/testing` ships for its own unit suite, and the composer-installed `vendor/bin/phpunit` stub loads
+   `vendor/autoload.php` itself.
+
+**Verification actually performed** (see the honesty rule in §14): the PHP was **not executed** — there is
+still no PHP in this environment, so the tests are **unverified until CI runs**. What was done instead: both
+algorithms were re-implemented as a throwaway perl model and the full §14 test matrix plus every case in the
+two written test files was run through it — **67/67 cases produce the expected result**. That validates the
+algorithm (regex behaviour, sort stability, truncation, per-candidate tier ordering, alias folding), *not* the
+PHP syntax. Structural checks also passed: UTF-8 without BOM, LF endings, no tabs, no trailing whitespace,
+final newline, balanced braces/parens/brackets, and `! ` spacing per `.styleci.yml`'s
+`logical_not_operators_with_successor_space`.
+
+**Phase 4 — Apply & remember. ← NEXT.** `Middleware/DetectLanguage` inserted before `SetLocale`; guest cookie;
 authenticated users **only when they have no locale**; one-time behaviour. Integration tests, including
-"manual locale never overwritten".
+"manual locale never overwritten". §7 already carries the verified pipeline order, core's `SetLocale` source,
+the `Extend\Middleware` `insertBefore` gotcha, and the user-locale rules; §13 risk 6 is now closed, so
+`setLocale()` can be called with `es_MX` / `zh-Hans` unguarded. This is the phase that first references
+project classes from `extend.php`.
 
 **Phase 5 — Standalone IP lookup.** `IpCountryLookup` (private-IP rejection → edge headers → binary search);
 `scripts/build-ip-data.php`; generate and spot-check `ip4.dat` / `ip6.dat`; `CountryLanguage`. Unit tests
@@ -558,15 +603,20 @@ tests, README (privacy section is mandatory), CHANGELOG. **Do not begin the Flar
 4. **RIR precision** is registrant-level and coarser than commercial DBs. Acceptable for language selection;
    DB-IP Lite is the documented upgrade path if it proves insufficient.
 5. **Cookie-based unique counts are approximate** by design — a deliberate privacy tradeoff to document.
-6. **`Translator::setLocale()` input validation is unverified.** Symfony's `Translator::setLocale()` calls
-   `assertValidLocale()`, whose accepted character set could not be checked here — the sparse core checkout has
-   no `vendor/`. Not a Phase 3 concern (matching only ever *returns* keys that are already in `getLocales()`,
-   i.e. codes Flarum itself registered), but confirm it before Phase 4 calls `setLocale()` with a value like
-   `es_MX` or `zh-Hans`.
+6. ~~**`Translator::setLocale()` input validation is unverified.**~~ **Closed 2026-08-24 (Phase 3).** Read
+   directly from `vendor/symfony/translation/Translator.php`: `setLocale()` calls `assertValidLocale()`, which
+   is `preg_match('/^[a-z0-9@_\.\-]*$/i', $locale)`. Underscores, hyphens and mixed case are all accepted, so
+   `es_MX` and `zh-Hans` pass. Phase 4 can call `setLocale()` with any key `getLocales()` returns without
+   guarding it.
 
 ---
 
-## 14. Phase 3 work order — start here
+## 14. Phase 3 work order — ✅ implemented, kept as the algorithm's specification
+
+> **Phase 3 is done** (§12 records what was built, the six decisions taken, and exactly what was and was not
+> verified). This section is retained because it is still the authoritative statement of the parsing and
+> matching rules — Phase 10's review should check the code against it, and Phases 4–7 depend on its contracts.
+> Do not re-implement it.
 
 **Goal:** two pure, dependency-light classes plus their unit tests. Browser-language *detection and
 resolution* only. Nothing is wired up yet.
