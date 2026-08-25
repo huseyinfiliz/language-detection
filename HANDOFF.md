@@ -1,17 +1,21 @@
 # Handoff — `huseyinfiliz/language-detection` (Flarum 1.x)
 
-> **Status: Phases 1–5 are complete. Phase 6 (analytics) is next — its full work order is §17;
-> start there.** §6 carries the data model and counting rules Phase 6 implements; §16 is now the
-> specification of the IP lookup Phase 6 takes a country code from.
+> **Status: Phases 1–6 are complete. Phase 7 (missing languages) is next — its full work order is §18;
+> start there.** §6 carries the data model, §17 is now the specification of the counting that fills it, and
+> §14 is the specification of the matcher Phase 7 diffs against.
 > This file exists so a fresh session can resume without re-doing discovery.
 > It is a working document — remove it (or gitignore it) before release.
 >
 > **Repository state, 2026-08-25:** branch `1.x`, pushed to `origin/1.x` through Phase 4 (`cb43798`);
-> Phase 5 (`b5a7567`) is committed locally and still needs pushing.
+> Phase 5 (`b5a7567`) and Phase 6 (`875e7eb`) are committed locally and still need pushing.
 > Phase 5 adds `src/IpCountryLookup.php`, `src/CountryLanguage.php`, `scripts/build-ip-data.php`, the
 > generated `resources/ip4.dat` / `ip6.dat` / `ip-data.php`, two new unit test files and the `.dat` fixtures —
 > **2.2 MB of committed binary data**, which is the first push where that matters. It is also the first phase
 > whose behaviour `detection_order` can actually change, so CI now exercises both orders.
+> Phase 6 adds `src/Analytics.php`, `src/BotDetector.php`, three new test files and the counting hook in
+> `Middleware/DetectLanguage.php`. It is the first phase whose core behaviour is *database* behaviour, so it is
+> also the first where CI's MySQL run — not local reading — is the only thing that can confirm the feature
+> works at all.
 >
 > **Commit convention (standing instruction from the project owner):** author **and** committer are
 > `Hüseyin Filiz <mysuperuser01@gmail.com>`; never add a `Co-Authored-By: Claude … <noreply@anthropic.com>`
@@ -785,12 +789,107 @@ None of that says anything about the PHP. The perl mirror agreeing with the perl
 *algorithm and the dataset*, not one line of `IpCountryLookup.php` — and `scripts/build-ip-data.php` remains
 entirely unrun (§13 risk 1).
 
-**Phase 6 — Analytics. ← NEXT. Full work order in §17.** Atomic daily upsert, request counting, cookie-date
-unique counting, country codes, bot filtering, `enable_analytics` honoured. Tests including bot exclusion and
-analytics-disabled.
+**Phase 6 — Analytics. ✅ DONE.** Work order in §17, followed with one deviation (decision 1 below).
+Built: `src/Analytics.php`, `src/BotDetector.php`, `tests/unit/AnalyticsTest.php` (21 tests),
+`tests/unit/BotDetectorTest.php` (5 test methods, 18 cases once its two data providers expand),
+`tests/integration/StatisticsTest.php` (15 tests), plus the counting hook in `src/Middleware/DetectLanguage.php`.
+`extend.php` is **unchanged** — see decision 2.
 
-**Phase 7 — Missing languages.** `LanguageCatalog` diffing requested locales against
-`LocaleManager::getLocales()`, sorted by request volume, with a "View language package" link.
+Decisions taken during Phase 6:
+
+1. **Deviation — `record()` takes the clock as a third argument.** §17 sketched
+   `record(ServerRequestInterface $request, bool $isNewVisitor): bool` and explicitly left the shape to
+   judgement; the signature shipped is `record(ServerRequestInterface, bool, Carbon)`. The reason is ownership,
+   not style: `'flarum.forum.handler'` is a container **singleton** (*verified* —
+   `vendor/flarum/core/src/Forum/ForumServiceProvider.php:92-103`, whose middleware are `$container->make()`d
+   once per booted app), so `DetectLanguage` is built once and reused for every request through that process. A
+   `Carbon` memoised on `Analytics` would freeze at the first request's time and stay there — visible in the
+   integration suite, where several `send()` calls share one instance, and fatal in a long-lived process, where
+   views would accumulate against a date that has already passed. Reading `Carbon::now()` once per `process()`
+   and passing it down is also what makes §17's midnight requirement true *by construction* rather than by
+   discipline: the row's `date` and the cookie's value are the same string because they are the same object.
+2. **`extend.php` needed no change, as §17 predicted.** `Illuminate\Database\ConnectionInterface` — note the
+   namespace: `Illuminate\Database`, **not** `Illuminate\Contracts\Database`, which has no such file in this
+   vendor tree — is a container singleton with `db.connection` / `flarum.db` aliases, so the whole five-argument
+   `Analytics` and the now four-argument middleware autowire as they stand.
+3. **The over-long tag is skipped in *preference order*, not simply dropped.** §17 says "skip any tag longer
+   than 20 bytes", which leaves open what to record instead. `requestedLocale()` walks the parsed tags in the
+   order the parser returns them (most-preferred first) and takes the first whose normalised form fits, so
+   `zh-Hans-CN-x-aaaaaaaa,tr;q=0.9` records `tr` — a real language the visitor really asked for — rather than
+   `''`. Only a header in which *every* tag is over-long records nothing.
+4. **The bare `bot` token was kept, and the CUBOT false positive is asserted deliberately.** §17 offered either
+   choice provided the tradeoff was stated. Kept because the trade is asymmetric in a way that decides it: both
+   directions distort an already approximate statistic, but under-counting leaves an admin with a number that is
+   a little low, while over-counting hands them inflated traffic figures they might *act* on — installing a
+   language pack for readers who were never there. `test_a_phone_whose_brand_name_contains_bot_is_counted_as_one`
+   asserts `true` on a real CUBOT NOTE 20 UA so that nobody later reads the behaviour as an oversight.
+5. **`AnalyticsTest` was written, and it asserts the upsert arguments after all.** §17 called the file optional
+   and advised skipping SQL assertions because "asserting that with a mocked `ConnectionInterface` tests the
+   mock's expectations, not the SQL". That is right about the *statement* and wrong about the *arguments*: three
+   of §17's own four traps are visible in the arguments alone and are silent failures if got wrong — a
+   numeric-keyed `$update` compiles to `values(col)` and would make every view write `requests = 1`; a missing
+   timestamp leaves every row with nulls; a bound `unique_visitors + ?` has no placeholder to bind to. So a spy
+   captures `[$values, $uniqueBy, $update]` and the tests pin those three. What is *not* asserted here, per §17,
+   is any claim about what MySQL does with them.
+6. **"Nothing was written" is asserted with an expectation-free double.** Mockery throws
+   `BadMethodCallException` on any call to a mock with no expectations, so
+   `Mockery::mock(ConnectionInterface::class)` *is* the assertion for the analytics-off and bot-ignored paths.
+   No query counting, and no way for a stray write to pass quietly.
+7. **`AnalyticsTest` mocks the settings repository instead of reusing `SettingsStub`.** Not a preference:
+   `LanguageDetectorTest` declares `SettingsStub` in the same namespace, and **neither `tests/unit/` nor
+   `tests/integration/` is autoloadable** — `autoload-dev` maps `HuseyinFiliz\LanguageDetection\Tests\` →
+   `tests/`, while the namespace segments are `Unit`/`Integration` and the directories are `unit`/`integration`.
+   PHPUnit loads each test file whole, so a second declaration would be a fatal error, and one test class cannot
+   reference another's constants. That last part is why `StatisticsTest` spells out
+   `flarum_language_detection_locale` rather than reading `DetectionTest::COOKIE`, which would have resolved
+   only by accident on a case-insensitive filesystem and broken on CI's Linux.
+8. **The second-view integration test resends `Accept-Language`.** Obvious in hindsight and easy to get wrong:
+   the row is keyed on `(date, locale, country_code)`, so a second request without the header would record the
+   `''` locale, land on a *different* row, and prove nothing about incrementing. §17's warning about
+   `DetectionTest`'s `lang` caveat (§12 Phase 4 decision 6) does not apply here — these are row assertions —
+   but the keying trap is adjacent and worth the same care.
+9. **`COOKIE` renamed to `LOCALE_COOKIE`** now that the middleware owns two cookies. Verified safe: no external
+   reference exists — `extend.php` names only `DetectLanguage::class`, and `DetectionTest` carries its own
+   literal. The name on the wire is unchanged.
+10. **The POST test targets a route that exists.** The first draft sent `POST /`, which cannot fail: with no
+    route to resolve, the exception unwinds past this middleware before a response exists, so nothing is counted
+    whether the `GET` guard is there or not — exactly the reasoning that made Phase 4 decline its own POST test
+    (§12 Phase 4 decision 7). Rewritten to `POST /global-logout` with `authenticatedAs`, which is a real forum
+    route (*verified* — `vendor/flarum/core/src/Forum/routes.php:52`) whose controller returns an
+    `EmptyResponse`, and `requestAsUser()` sets `bypassCsrfToken` (*verified* — `BuildsHttpRequests:56`), so the
+    request completes normally. Remove the guard and the test genuinely writes a row.
+11. **A wrong reason, corrected before commit.** `StatisticsTest`'s `today()`/`yesterday()` helpers call
+    `$this->app()` before reading `Carbon::now()`, and their first docblock justified it with
+    `Foundation\Site.php:25`'s `date_default_timezone_set('UTC')` "on boot". That is not what happens: the call
+    is in `Site::fromPaths()`, which the web entry point uses and which the integration harness never calls —
+    it builds `InstalledSite` directly (*verified* — `flarum/testing`'s `TestCase::app()`). The helpers were
+    kept, because reading the date through the same clock the middleware reads is right regardless and the
+    `app()` call costs nothing, but the docblock now says the true reason instead of a plausible one.
+
+**Verification actually performed:** the PHP was **not executed** — there is still no PHP, composer, node or
+npm in this environment, so all three new test files and both new source files are **unverified until CI runs**.
+Beyond that, and this is the point worth stating plainly: **Phase 6's central mechanism cannot be verified here
+at all.** That the unique index collapses repeat views onto one row rather than accumulating near-duplicates,
+and that `on duplicate key update` increments what is already there atomically under concurrency, are facts
+about MySQL. They are unexercised until `tests/integration/StatisticsTest.php` runs against a real MySQL in CI,
+and no amount of local reading substitutes. Unlike Phase 5 — where the `.dat` files were *data* and a perl
+mirror could check them — there is no local stand-in for a database.
+
+What was done instead: every vendor API the new code touches was re-read at the locked versions.
+`Builder::upsert()` (`Query/Builder.php:3116`: `$update === []` → plain insert; `is_null($update)` →
+`array_keys(reset($values))`), `MySqlGrammar::compileUpsert()` (line 188 — ignores `$uniqueBy`, and the
+`is_numeric($key)` branch that makes the numeric-key form emit `values()`), `Grammar::parameter()` (returns an
+`Expression`'s value verbatim, so raw SQL is inlined with no placeholder), `Builder::cleanBindings()` (line
+3369 — rejects every `Expression`), and `Connection::prepareBindings()` (line 630 — formats a `DateTimeInterface`
+through the grammar's date format, which is what makes passing `Carbon` for the timestamps correct rather than
+merely convenient). Also re-verified: `FigResponseCookies::set()` composes through `SetCookies`, which is keyed
+by cookie name, so adding the day cookie to a response already carrying the locale cookie preserves both.
+Structural checks as in every earlier phase: UTF-8 without BOM, LF endings, no tabs, no trailing whitespace,
+final newline, balanced braces/parens/brackets, `! ` spacing per `.styleci.yml`, alphabetical imports.
+
+**Phase 7 — Missing languages. ← NEXT. Full work order in §18.** `LanguageCatalog` diffing requested locales
+against `LocaleManager::getLocales()`, sorted by request volume, with a "View language package" link.
+`locale = ''` must be excluded from that report explicitly (§17).
 
 **Phase 8 — Admin dashboard.** `ExtensionPage` subclass in the `fof/badges` idiom; the three API endpoints;
 summary cards; languages / missing / countries tables; 7·30·90-day inline-SVG trend; settings tab. Complete
@@ -1356,8 +1455,12 @@ the status header above. Close Phase 5 out the way every phase closes: record wh
 
 ---
 
-## 17. Phase 6 work order — analytics (**← START HERE**)
+## 17. Phase 6 work order — ✅ implemented, kept as the analytics specification
 
+> Read alongside §12's Phase 6 record, which lists the eleven decisions taken while building it — including the
+> one deviation from the `record()` signature sketched below, and the two places this section's advice was
+> narrowed (the over-long tag) or overruled (`AnalyticsTest` was written, not skipped).
+>
 > Self-contained on purpose: a fresh session should be able to build Phase 6 from this section plus the
 > cross-references below, without re-doing discovery. API claims marked *verified* were read out of
 > `vendor/` on 2026-08-25 at the locked versions (`flarum/core` 1.8.19, `illuminate/database` **v8.83.27**).
@@ -1611,3 +1714,248 @@ newline, balanced braces/parens, `! ` spacing, alphabetical imports, and StyleCI
 Finish by adding a `CHANGELOG.md` line under `## [Unreleased] / ### Added`, then commit per the convention in
 the status header above. Close Phase 6 out the way every phase closes: record what was built and decided in
 §12, and write the Phase 7 work order as §18.
+
+---
+
+## 18. Phase 7 work order — missing languages (**← START HERE**)
+
+> Self-contained on purpose: a fresh session should be able to build Phase 7 from this section plus the
+> cross-references below, without re-doing discovery. API claims marked *verified* were read out of `vendor/`
+> and out of this repository on 2026-08-25 at the locked versions (`flarum/core` 1.8.19,
+> `illuminate/database` v8.83.27).
+
+**Read first, in this order:** §17's second correction (what the `locale` column actually holds, and why —
+Phase 7 is the reason that decision was made), §14 (the specification of `LocaleMatcher`, which is what "can
+this forum serve that language?" means in this codebase), §12 Phase 3 decision 1 (the macrolanguage map, added
+*specifically* so this report would not lie about Norwegian), §6's "fallback requests need no extra column",
+and the header of `resources/languages.php`.
+
+**Goal:** answer one question for an admin, from data the forum already has — *which languages are my visitors
+asking for that I cannot serve them?* — and hand each answer the Composer package that would fix it. This is
+the payoff for §17's decision to record the **requested** locale rather than the resolved one, and it is the
+first phase that reads the statistics table back.
+
+Phase 7 is server-side only. It produces the report; §8's `Api/MissingLanguagesController` and the admin table
+that renders it are Phase 8.
+
+### Scope discipline — what Phase 7 must NOT touch
+
+- **No admin UI, no API endpoint, no new `locale/*.yml` keys, no TypeScript, no LESS.** Phase 8 owns all of
+  that, including the display strings for this report. Phase 7 returns plain arrays.
+- **No `src/Statistics.php`.** Still Phase 8's, and still the file to resist creating early (§17 said the same).
+  When Phase 8 arrives, `Api/MissingLanguagesController` must call `LanguageCatalog::missing()` — the query must
+  **not** be reimplemented in `Statistics.php`. Say so in the Phase 8 work order.
+- **Do not change `BrowserLanguageParser`, `LocaleMatcher`, `CountryLanguage`, `IpCountryLookup`,
+  `LanguageDetector`, `Analytics`, `BotDetector` or `Middleware/DetectLanguage`.** §14, §15, §16 and §17 are
+  their specifications. Phase 7 *consumes* them and adds nothing to the request path — no middleware change, no
+  new work on a page view. Reading is an admin-side operation and must stay one.
+- **Do not edit `resources/languages.php` to make the code simpler.** It is upstream data (§11, and its own
+  header): `es_AR`/`es_MX` carry underscores, `uzb` is not `uz`, `zh-Hans`/`sr-Cyrl` are mixed case, and every
+  one of those is deliberate because the keys must stay usable verbatim with `LocaleManager::hasLocale()`. If
+  the code and the data disagree, the code is wrong — that is §12 Phase 5 decision 11, which was learned the
+  hard way on `resources/countries.php`.
+- **No retention, no cleanup, no writes of any kind.** Phase 9, and Phase 7 issues `SELECT` only.
+
+### Deliverables
+
+```
+src/LanguageCatalog.php
+tests/unit/LanguageCatalogTest.php
+tests/integration/MissingLanguagesTest.php
+CHANGELOG.md
+```
+
+`extend.php` needs **no change**, for the same two reasons Phase 5 and Phase 6 needed none: the constructor
+takes `LocaleManager`, `LocaleMatcher`, `ConnectionInterface` and a nullable `?string $path = null`, and
+Laravel's `resolvePrimitive()` fills an unresolvable primitive from its default rather than throwing (§12 Phase
+5 decision 3). Nothing is registered until Phase 8 needs a route.
+
+### `LanguageCatalog`
+
+Mirror `CountryLanguage`'s shape for the data half — `?string $path = null` defaulting to
+`dirname(__DIR__).'/resources/languages.php'`, memoised, loaded with `require` and **not** `require_once` (a
+second `require_once` of the same file returns `true`, not the array — see `CountryLanguage::map()`, which
+documents the trap). That nullable path is also the test seam.
+
+```php
+public function __construct(
+    LocaleManager $locales,
+    LocaleMatcher $matcher,
+    ConnectionInterface $db,
+    ?string $path = null
+) {}
+
+/** @return array<string, array{name: string, native: string, package: string|null}> the whole catalog */
+public function all(): array;
+
+/** @return array{name: string, native: string, package: string|null}|null the pack that would serve $code */
+public function entryFor(string $code): ?array;
+
+/** @param array<string, int[]> $volumes normalised requested tag => [requests, unique_visitors] */
+public function missingFrom(array $volumes): array;
+
+/** @param int|null $days window in days; null means all time */
+public function missing(?int $days): array;
+```
+
+The split is the point: `all()`, `entryFor()` and `missingFrom()` are **pure** — no database, no clock — and
+`missing()` is a thin wrapper that runs one aggregate query and hands the result to `missingFrom()`. That is
+what makes the interesting half unit-testable without MySQL, which Phase 6 could not manage and paid for (§12
+Phase 6, "Verification actually performed").
+
+### The two questions are independent — do not collapse them
+
+This is the design trap in Phase 7, and getting it wrong produces a report that is confidently wrong rather
+than merely incomplete.
+
+1. **Is this requested tag served by anything installed?** That is `$matcher->match([$tag])` returning `null`,
+   and nothing else. `LocaleMatcher` is the one place in this extension that decides what "installed" means
+   (§14), it is exactly what the middleware asked at detection time, and it already handles exact matching,
+   progressive truncation, the `uzb`/`uz` alias and the unambiguous-sibling rule. A hand-rolled
+   `in_array($tag, $locales)` would report `tr-tr` as missing on a forum with `tr` installed — a request that
+   was served, listed as one that was not.
+2. **Which pack would serve it?** That is the catalog, and it is a *different* question. `pt-br` resolves to
+   catalog entry `pt-BR`; but on a forum with `pt` installed and `pt-BR` not, `match(['pt-br'])` returns `pt`,
+   so the tag is **served** and must not appear in this report at all.
+
+So: **filter to unserved tags first, then group the survivors by catalog entry.** In that order there is no
+such thing as a group with some tags served and some not, and the `pt-br`/`pt` case above resolves correctly by
+construction. Grouping first and filtering second creates exactly that mixed group and there is no honest way
+out of it.
+
+Two consequences worth stating rather than discovering:
+
+- **`pt-BR` requested while `pt` is installed is not "missing".** The visitor got Portuguese. A separate
+  "regional variants you could add" report is a defensible feature and it is not this one; listing a served
+  request as missing is the "visibly wrong signal to an admin" §12 Phase 3 decision 1 was written to avoid.
+- **`locale = ''` must be excluded explicitly** (§17). It is not a language, it is "this visitor stated no
+  preference", and it is typically the largest bucket in the table — left in, it would top the report as a
+  missing language named nothing.
+
+### Resolving a requested tag to a catalog entry
+
+The table holds tags already lowercased and hyphenated by `Analytics::requestedLocale()` (`pt-br`, `zh-hans-cn`,
+`tr-tr`). Catalog keys are not (`pt-BR`, `zh-Hans`, `es_AR`, `uzb`). So build a normalised index once — folded
+key => the verbatim key — and resolve against it:
+
+1. Fold **both sides identically**, and fold them the way `LocaleMatcher::normalize()` does:
+   `strtolower(str_replace('_', '-', $code))`, then `LocaleMatcher::CODE_ALIASES` applied to the **language
+   subtag**. Mind the direction — the map is `['uzb' => 'uz']` (*verified* — `src/LocaleMatcher.php:45-47`,
+   `public`, no visibility modifier), so it points **catalog key → ISO code**, not the other way round. Applying
+   it while *building the index* files catalog `uzb` under `uz`; applying it to the requested tag too means a
+   browser that sends `uzb` verbatim folds to the same place. That is precisely how
+   `LocaleMatcher::normalize()` makes installed `uzb` answer a requested `uz` (*verified* —
+   `src/LocaleMatcher.php:203-219`, and its docblock says why: browsers send the three-letter codes verbatim,
+   and `uzb` is the only one of the catalog's seven with an ISO 639-1 equivalent). Do **not** flip the map, do
+   **not** copy it, and do **not** call `normalize()` — it is `protected` and is not part of that class's
+   contract (§14). Reproducing those three lines here is the same honest duplication §17 licensed for
+   `Analytics`.
+2. Exact match on the folded index. With step 1 done properly this is what resolves `pt-br` → `pt-BR`,
+   `es-ar` → `es_AR` and `uz` → `uzb`; there is no separate alias step.
+3. Progressive truncation, one subtag at a time: `zh-hans-cn` → `zh-hans`, which hits catalog `zh-Hans`. One
+   subtag at a time and not a single strip to the base language, and here the catalog settles it rather than
+   taste: **`zh` is not a catalog key at all** (*verified* — `resources/languages.php` has `zh-Hans` and
+   `zh-Hant` and no `zh`; 87 keys in total). Strip straight to the base language and Chinese resolves to
+   nothing, so a forum full of Simplified Chinese requests would be told no pack exists. `sr-Cyrl`/`sr-Latn`
+   are the same shape.
+4. Otherwise `null`.
+
+One consequence of `Analytics::requestedLocale()` folding case and separators but **not** aliases: the table can
+hold `uz` and `uzb` as two rows for one language. They are two distinct requested tags and storing them apart is
+right — but they resolve to one catalog entry, so grouping by entry sums them, which is the answer an admin
+wants. Same mechanism as `tr` and `tr-tr`.
+
+**`entryFor()` returns `null` for two genuinely different reasons, and that is acceptable.** A tag Flarum has no
+pack for at all (`sw`, `zu` — real languages, no `flarum-lang` package) and a macrolanguage with more than one
+catalog member (`no`, whose members `nb` and `nn` are both catalog keys; `ku` → `ckb`/`kmr`) both come back
+`null`. Deliberately: arbitrating between Bokmål and Nynorsk on an admin's behalf is not this report's job, and
+"47 people asked for `no`" is a useful thing to show even with no single package to link. So a report row
+carries a nullable name/native/package, Phase 8 renders those as "no package available", and both cases are
+reported rather than silently dropped. **Do not** filter unresolvable tags out — a language with no pack is the
+one piece of demand an admin can do nothing about, and hiding it makes the totals lie.
+
+Also note: `en` is in the catalog with `'package' => null` on purpose (§12 Phase 2 decision 2, for display
+names), and it is never missing in practice because core ships it. Do not special-case it; the null package
+handles it if it ever appears.
+
+### The query
+
+```php
+$this->db->table(Analytics::TABLE)
+    ->selectRaw('locale, SUM(requests) AS requests, SUM(unique_visitors) AS visitors')
+    ->where('locale', '!=', '')
+    ->groupBy('locale')
+    ->get();
+```
+
+with `->where('date', '>=', Carbon::now()->subDays($days)->toDateString())` when `$days` is not null. Notes:
+
+- **Read the clock inside the method, not in the constructor.** Same hazard as Phase 6, different container
+  entry: memoising "today" on a long-lived object freezes the window. There is no reason to memoise it, so do
+  not (§12 Phase 6 decision 1 has the full argument).
+- **`SUM()` comes back as a string through PDO.** Cast to `int` before sorting or returning, or a JSON response
+  ships `"requests": "41"` and the dashboard sorts lexicographically.
+- **Referencing `Analytics::TABLE` rather than a second literal** keeps one name for the table. Reading a
+  constant is not "changing `Analytics`".
+- The `WHERE date >= ?` range is a leftmost prefix of the unique index on `(date, locale, country_code)`
+  (§12 Phase 2 decision 3), so the index is usable for both the range and the grouping.
+- `locale` is in the `GROUP BY`, so `ONLY_FULL_GROUP_BY` is satisfied.
+
+**Sort by `requests` descending, tie-broken by locale code ascending.** The tie-break is not cosmetic: without
+it, MySQL's row order for equal sums is unspecified and the integration test becomes intermittent. Sort in PHP
+after grouping by catalog entry rather than in SQL, because the grouping happens after the query.
+
+### Tests
+
+**`tests/unit/LanguageCatalogTest.php`** — the whole interesting half, with no database. Use a **real**
+`LocaleManager` (`new LocaleManager(new Translator('en'))` plus `addLocale()` calls) and a real `LocaleMatcher`
+over it, per §9 and §12 Phase 3 decision 5 — never a Mockery double for these, or the test asserts which
+methods were called instead of which languages are missing. Pass an expectation-free
+`Mockery::mock(ConnectionInterface::class)` as the connection: every test in this file must go through
+`missingFrom()`, so any query at all is a bug, and the bare double makes that an assertion (§12 Phase 6
+decision 6). Point the constructor at the real `resources/languages.php` — it is committed data, not a fixture,
+and testing against a stub catalog would prove nothing about the file that ships.
+
+Cases that each pin a decision above:
+
+- `ja` requested, not installed → missing, name `Japanese`, package `flarum-lang/japanese`.
+- `tr-tr` requested, `tr` installed → **absent** from the report (the `LocaleMatcher` question).
+- `pt-br` requested, `pt` installed but not `pt-BR` → **absent** (the filter-before-group ordering).
+- `pt-br` requested, neither installed → missing, and resolves to the `pt-BR` entry, not `pt`.
+- `zh-hans-cn` → the `zh-Hans` entry (truncation, and the mixed-case key survives). Assert the entry, not just
+  that something was found: this is the case a strip-to-base-language shortcut resolves to `null`.
+- `uz` → the `uzb` entry, and `uzb` → the same entry (the alias, folded on both sides, in both directions).
+- `es-ar` → the `es_AR` entry (the underscore key, reached through the folded index).
+- `no` with `nb` installed → absent; `no` with neither installed → present with a null package.
+- `sw` → present with a null name and package.
+- `''` → never present, whatever its volume.
+- `tr` and `tr-tr` both requested and neither installed → **one** row with the volumes summed.
+- Equal volumes → deterministic order.
+
+**`tests/integration/MissingLanguagesTest.php`** — the query, end to end. Seed rows with
+`$this->database()->table('language_detection_stats')->insert(...)` rather than by sending requests: the report
+is about aggregation across days and locales, and building that history through the middleware would take
+dozens of requests and pin the test to today's date. Copy Phase 5's deferred-boot pattern (§12 Phase 5
+decision 8) if any test needs `setting()`; register locales on the `LocaleManager` singleton as
+`DetectionTest`/`StatisticsTest` do, and resolve `LanguageCatalog` from the container so the autowiring claim
+above is actually exercised. Cases: rows across several dates aggregate; `$days` excludes rows outside the
+window while keeping rows inside it; `null` includes everything; `''` is excluded; a locale that is installed
+is excluded; and the sums are integers rather than numeric strings.
+
+### Verification available in this environment
+
+Unchanged and still binding: **there is no PHP here** — no phpunit, no `php -l`, no composer. CI is the only
+gate. **Never state or imply that the tests pass.** Report what was written and that it is unverified until CI
+runs, and say plainly that the aggregate query itself is unexercised until the integration suite runs against
+real MySQL — the unit suite deliberately never issues it. What *can* be checked here, and should be: that every
+catalog key the tests name really exists in `resources/languages.php` with the spelling asserted (grep it — this
+is the one Phase 7 claim that is checkable locally, and `es_AR` versus `es-AR` is exactly the kind of thing that
+fails in CI for no good reason), plus the usual structural pass — UTF-8 without BOM, LF endings, no tabs, no
+trailing whitespace, final newline, balanced braces/parens/brackets, `! ` spacing per `.styleci.yml`,
+alphabetical imports.
+
+Finish by adding a `CHANGELOG.md` line under `## [Unreleased] / ### Added`, then commit per the convention in
+the status header above. Close Phase 7 out the way every phase closes: record what was built and decided in
+§12, and write the Phase 8 work order as §19 — and make sure that work order carries the two boundaries this
+one depends on, namely that `Api/MissingLanguagesController` calls `LanguageCatalog::missing()` instead of
+re-querying, and that the display strings for null names and null packages are Phase 8's to add.
