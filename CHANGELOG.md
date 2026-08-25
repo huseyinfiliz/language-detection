@@ -25,3 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Engine or a web server's GeoIP module. No external service is contacted, no API key is
   needed, and the visitor's address is read, used and dropped -- never stored or logged.
   The `detection_order` setting now decides which source wins when both have an answer.
+- Analytics: every page view is counted against a `(date, requested_locale, country)` row,
+  so an admin can see both what languages their visitors ask for and -- crucially -- which
+  languages they ask for that the forum does not yet have. Unique visitors are counted with
+  a date-only cookie that expires at midnight; nothing identifying is stored server-side.
+  Bots are excluded by default (`ignore_bots` setting); analytics can be switched off
+  entirely (`enable_analytics` setting).
