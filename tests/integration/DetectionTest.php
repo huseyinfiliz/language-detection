@@ -16,6 +16,7 @@ use Flarum\Locale\LocaleManager;
 use Flarum\Testing\integration\RetrievesAuthorizedUsers;
 use Flarum\Testing\integration\TestCase;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
 
 class DetectionTest extends TestCase
 {
@@ -33,6 +34,8 @@ class DetectionTest extends TestCase
      */
     protected string $forumDefault;
 
+    protected bool $booted = false;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -46,19 +49,37 @@ class DetectionTest extends TestCase
             ],
         ]);
 
-        // Boots the app, so every `extension()` and `prepareDatabase()` call has to happen
-        // above this line. Reading the forum's own default instead of assuming `en` keeps
-        // the fallback assertions true whatever the test installation is configured with.
-        $this->forumDefault = $this->localeManager()->getLocale();
+        // Deliberately nothing here that touches `app()`: booting is what makes the harness's
+        // `setting()` a no-op, so a test that needs to configure a setting has to be able to
+        // do it before the first request. `send()` boots instead, on first use.
+    }
 
-        // The test forum registers only its default locale, and `Extend\LanguagePack` needs
-        // a real installed extension, so the locales these tests need are added straight to
-        // the LocaleManager -- the same `getLocales()` keys a language pack would add. No
-        // translations come with them, so Symfony serves English strings for both; that is
-        // why every assertion below is about the document's `lang` attribute, which reports
-        // the locale that was actually applied, rather than about translated text.
-        $this->localeManager()->addLocale('tr', 'Türkçe');
-        $this->localeManager()->addLocale('de', 'Deutsch');
+    /**
+     * Reading `localeManager()` boots the app, so everything that must happen before boot has
+     * to have happened by now -- which is why this hangs off the first request rather than off
+     * `setUp()`.
+     */
+    protected function send(ServerRequestInterface $request): ResponseInterface
+    {
+        if (! $this->booted) {
+            $this->booted = true;
+
+            // Reading the forum's own default instead of assuming `en` keeps the fallback
+            // assertions true whatever the test installation is configured with.
+            $this->forumDefault = $this->localeManager()->getLocale();
+
+            // The test forum registers only its default locale, and `Extend\LanguagePack`
+            // needs a real installed extension, so the locales these tests need are added
+            // straight to the LocaleManager -- the same `getLocales()` keys a language pack
+            // would add. No translations come with them, so Symfony serves English strings for
+            // both; that is why every assertion below is about the document's `lang`
+            // attribute, which reports the locale that was actually applied, rather than about
+            // translated text.
+            $this->localeManager()->addLocale('tr', 'Türkçe');
+            $this->localeManager()->addLocale('de', 'Deutsch');
+        }
+
+        return parent::send($request);
     }
 
     public function test_a_guest_is_served_the_language_their_browser_asks_for()
@@ -171,6 +192,112 @@ class DetectionTest extends TestCase
 
         // A signed-in visitor's language lives in their preferences, so no cookie is
         // written for them.
+        $this->assertNull($this->memo($response));
+    }
+
+    public function test_a_guest_whose_browser_asks_for_nothing_is_served_their_countrys_language()
+    {
+        // The whole point of the second source: no `Accept-Language` at all -- the case a
+        // browser-only extension can do nothing with -- and a country from the edge.
+        $response = $this->send(
+            $this->request('GET', '/')->withHeader('CF-IPCountry', 'TR')
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertStringContainsString('lang="tr"', (string) $response->getBody());
+        $this->assertSame('tr', $this->memo($response));
+    }
+
+    public function test_a_country_with_no_installed_language_keeps_the_forum_default()
+    {
+        // Japan maps to `ja` alone, which this forum does not have. Nothing is invented and
+        // nothing is remembered -- the same shape as the unmatched-header case.
+        $response = $this->send(
+            $this->request('GET', '/')->withHeader('CF-IPCountry', 'JP')
+        );
+
+        $this->assertStringContainsString('lang="'.$this->forumDefault.'"', (string) $response->getBody());
+        $this->assertNull($this->memo($response));
+    }
+
+    public function test_a_country_header_that_is_not_a_country_detects_nothing()
+    {
+        // `XX` is Cloudflare's "could not place this address", and the connecting address is
+        // `127.0.0.1` here -- ProcessIp's own default, since the harness sends no REMOTE_ADDR.
+        // So this asserts both halves of the lookup declining at once.
+        $response = $this->send(
+            $this->request('GET', '/')->withHeader('CF-IPCountry', 'XX')
+        );
+
+        $this->assertStringContainsString('lang="'.$this->forumDefault.'"', (string) $response->getBody());
+        $this->assertNull($this->memo($response));
+    }
+
+    public function test_the_browser_outranks_the_country_by_default()
+    {
+        // `browser_ip` is the shipped default, so this needs no `setting()` call: a German
+        // browser from a Turkish address is served German. Their browser is a statement of
+        // preference; their address is an inference.
+        $response = $this->send(
+            $this->request('GET', '/')
+                ->withHeader('Accept-Language', 'de')
+                ->withHeader('CF-IPCountry', 'TR')
+        );
+
+        $this->assertStringContainsString('lang="de"', (string) $response->getBody());
+        $this->assertSame('de', $this->memo($response));
+    }
+
+    public function test_the_country_outranks_the_browser_when_the_setting_says_so()
+    {
+        // The first assertion in this suite that `detection_order` does anything. It is also
+        // the reason `setUp()` no longer touches `app()`: `setting()` is seeded into the
+        // container before boot, and has no effect once the app is up.
+        $this->setting('huseyinfiliz-language-detection.detection_order', 'ip_browser');
+
+        $response = $this->send(
+            $this->request('GET', '/')
+                ->withHeader('Accept-Language', 'de')
+                ->withHeader('CF-IPCountry', 'TR')
+        );
+
+        // Byte for byte the same request as the test above, and a different answer.
+        $this->assertStringContainsString('lang="tr"', (string) $response->getBody());
+        $this->assertSame('tr', $this->memo($response));
+    }
+
+    public function test_the_browser_still_answers_under_ip_first_when_the_country_cannot()
+    {
+        // Ordering must not mean exclusivity: a country with no installed language has to
+        // fall through to the browser rather than end detection.
+        $this->setting('huseyinfiliz-language-detection.detection_order', 'ip_browser');
+
+        $response = $this->send(
+            $this->request('GET', '/')
+                ->withHeader('Accept-Language', 'de')
+                ->withHeader('CF-IPCountry', 'JP')
+        );
+
+        $this->assertStringContainsString('lang="de"', (string) $response->getBody());
+        $this->assertSame('de', $this->memo($response));
+    }
+
+    public function test_a_country_never_overrides_a_language_someone_chose()
+    {
+        // The rule the extension answers to, restated for the source that did not exist when
+        // it was first tested. German is this member's own choice; Turkey is an inference from
+        // a header, and loses to it under either order.
+        $this->setting('huseyinfiliz-language-detection.detection_order', 'ip_browser');
+
+        $response = $this->send(
+            $this->request('GET', '/', ['authenticatedAs' => 3])->withHeader('CF-IPCountry', 'TR')
+        );
+
+        $body = (string) $response->getBody();
+
+        $this->assertStringContainsString('lang="de"', $body);
+        $this->assertStringNotContainsString('lang="tr"', $body);
+        $this->assertSame('de', $this->storedLocale(3));
         $this->assertNull($this->memo($response));
     }
 

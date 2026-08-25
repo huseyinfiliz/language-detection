@@ -18,3 +18,12 @@
 **/js/package-lock.json -diff
 
 * text=auto eol=lf
+
+# After the catch-all above, because the last matching line wins: the IP dataset is read byte
+# by byte at fixed offsets, so `text=auto` must never get the chance to guess at it. `binary`
+# is `-text -diff`, which rules out both line-ending translation and a diff nobody could read
+# anyway. Git's own heuristic would reach the same conclusion from the NUL bytes, but a record
+# boundary is not a thing to leave to a guess.
+**/resources/*.dat binary
+**/resources/*.dat linguist-generated
+**/tests/fixtures/**/*.dat binary

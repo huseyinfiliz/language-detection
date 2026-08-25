@@ -19,3 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   page views, remembering it in a cookie for guests and in the `locale` preference for
   signed-in members. A visitor who has already chosen a language is never overridden, and
   a language that is not installed is never applied.
+- Country-based detection for visitors whose browser asks for nothing useful, from a
+  bundled 2.2 MB dataset built from the five regional internet registries' published
+  statistics, or from a country header set by Cloudflare, CloudFront, Vercel, Fastly, App
+  Engine or a web server's GeoIP module. No external service is contacted, no API key is
+  needed, and the visitor's address is read, used and dropped -- never stored or logged.
+  The `detection_order` setting now decides which source wins when both have an answer.

@@ -19,10 +19,10 @@ use Psr\Http\Message\ServerRequestInterface;
  * Works out which installed locale a request should be served in.
  *
  * The resolution chain lives here rather than in the middleware, which keeps the ordering
- * rules testable without an HTTP stack and leaves one obvious place for a second
- * detection source to slot into. What comes back is either an exact `getLocales()` key or
- * null, and null means "leave the locale alone" -- never a guess, and never `en`, which is
- * not guaranteed to be installed at all.
+ * rules testable without an HTTP stack: both detection sources are tried here, in the order
+ * `detection_order` asks for, and both end at the same `LocaleMatcher`. What comes back is
+ * either an exact `getLocales()` key or null, and null means "leave the locale alone" --
+ * never a guess, and never `en`, which is not guaranteed to be installed at all.
  */
 class LanguageDetector
 {
@@ -38,15 +38,19 @@ class LanguageDetector
      * The detection sources that exist.
      *
      * `detection_order` supplies the order and this supplies the reality: a source the
-     * setting names but this list does not carry is skipped. Only browser detection is
-     * implemented so far, so both values of that setting currently resolve to the same
-     * one-element list -- which is exactly why the setting has nothing to show yet.
+     * setting names but this list does not carry is skipped. Both sources are implemented,
+     * so the setting decides which one gets first refusal on a request that either could
+     * answer -- a visitor whose browser asks for German from a Turkish address.
      */
-    const SOURCES = [self::SOURCE_BROWSER];
+    const SOURCES = [self::SOURCE_BROWSER, self::SOURCE_IP];
 
     protected BrowserLanguageParser $parser;
 
     protected LocaleMatcher $matcher;
+
+    protected IpCountryLookup $lookup;
+
+    protected CountryLanguage $countries;
 
     protected SettingsRepositoryInterface $settings;
 
@@ -55,11 +59,15 @@ class LanguageDetector
     public function __construct(
         BrowserLanguageParser $parser,
         LocaleMatcher $matcher,
+        IpCountryLookup $lookup,
+        CountryLanguage $countries,
         SettingsRepositoryInterface $settings,
         LocaleManager $locales
     ) {
         $this->parser = $parser;
         $this->matcher = $matcher;
+        $this->lookup = $lookup;
+        $this->countries = $countries;
         $this->settings = $settings;
         $this->locales = $locales;
     }
@@ -102,6 +110,10 @@ class LanguageDetector
             return $this->fromBrowser($request);
         }
 
+        if ($source === self::SOURCE_IP) {
+            return $this->fromIp($request);
+        }
+
         return null;
     }
 
@@ -114,6 +126,24 @@ class LanguageDetector
         return $this->matcher->match(
             $this->parser->parse($request->getHeaderLine('Accept-Language'))
         );
+    }
+
+    protected function fromIp(ServerRequestInterface $request): ?string
+    {
+        $country = $this->lookup->countryFor($request);
+
+        // No country, or a country nobody has mapped a language to, and this source simply
+        // has no opinion -- the next one runs. Nothing distinguishes the two cases here,
+        // and nothing should: they mean the same thing to the caller.
+        if ($country === null) {
+            return null;
+        }
+
+        // Through the same matcher the browser source uses, deliberately: candidate
+        // languages from a country are candidates like any other, so they inherit subtag
+        // truncation, the code aliases and the unambiguous-sibling rule, and there stays one
+        // place in the extension that decides what "installed" means.
+        return $this->matcher->match($this->countries->candidatesFor($country));
     }
 
     /**

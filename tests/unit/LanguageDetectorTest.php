@@ -16,6 +16,8 @@ use Flarum\Locale\Translator;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\Testing\unit\TestCase;
 use HuseyinFiliz\LanguageDetection\BrowserLanguageParser;
+use HuseyinFiliz\LanguageDetection\CountryLanguage;
+use HuseyinFiliz\LanguageDetection\IpCountryLookup;
 use HuseyinFiliz\LanguageDetection\LanguageDetector;
 use HuseyinFiliz\LanguageDetection\LocaleMatcher;
 use Laminas\Diactoros\ServerRequest;
@@ -90,16 +92,88 @@ class LanguageDetectorTest extends TestCase
         $this->assertNull($detector->detect($this->request('tr')));
     }
 
-    public function test_browser_detection_runs_whichever_order_is_configured()
+    public function test_it_detects_the_country_the_address_is_in()
     {
-        // IP detection does not exist yet, so `ip_browser` cannot outrank anything -- but it
-        // also must not silently drop the source that does exist. This is a guard on the
-        // ordering filter, not a claim that the setting is observable: both values behave
-        // identically until IP detection lands.
-        foreach (['browser_ip', 'ip_browser', '', 'nonsense'] as $order) {
-            $detector = $this->detector(['en', 'tr'], ['detection_order' => $order]);
+        // The second source, end to end: an address in the fixture dataset, through the
+        // country map, through the same matcher the browser source uses.
+        $detector = $this->detector(['en', 'tr']);
 
-            $this->assertSame('tr', $detector->detect($this->request('tr')), "detection_order: '$order'");
+        $this->assertSame('tr', $detector->detect($this->request(null, '20.30.40.50')));
+    }
+
+    public function test_the_browser_outranks_the_address_by_default()
+    {
+        // `browser_ip` is the shipped default, and this is the case it decides: someone
+        // reading German from a Turkish address gets German. Their browser is a statement of
+        // preference; their address is an inference.
+        $detector = $this->detector(['en', 'tr', 'de']);
+
+        $this->assertSame('de', $detector->detect($this->request('de', '20.30.40.50')));
+    }
+
+    public function test_the_address_outranks_the_browser_when_configured_to()
+    {
+        // The mirror image, and the first time `detection_order` is observable at all: the
+        // same request, the same installed locales, a different answer.
+        $detector = $this->detector(['en', 'tr', 'de'], ['detection_order' => 'ip_browser']);
+
+        $this->assertSame('tr', $detector->detect($this->request('de', '20.30.40.50')));
+    }
+
+    public function test_the_address_answers_when_the_browser_cannot()
+    {
+        // What the second source is for: a browser asking for a language this forum does not
+        // have, from an address whose country it can serve.
+        $detector = $this->detector(['en', 'tr']);
+
+        $this->assertSame('tr', $detector->detect($this->request('ja', '20.30.40.50')));
+    }
+
+    public function test_the_browser_answers_when_the_address_cannot()
+    {
+        // And the same in reverse, under `ip_browser`: an unmapped address must not stop the
+        // browser source from running.
+        $detector = $this->detector(['en', 'tr'], ['detection_order' => 'ip_browser']);
+
+        $this->assertSame('tr', $detector->detect($this->request('tr', '9.4.5.6')));
+        $this->assertSame('tr', $detector->detect($this->request('tr', '127.0.0.1')));
+    }
+
+    public function test_a_country_whose_languages_are_not_installed_detects_nothing()
+    {
+        // Japan maps to `ja` alone. With no Japanese installed there is nothing to fall back
+        // on -- and nothing invented: `en` is not a safety net.
+        $detector = $this->detector(['en', 'tr']);
+
+        $this->assertNull($detector->detect($this->request(null, '2001:200::1')));
+    }
+
+    public function test_an_ip_candidate_is_matched_the_same_way_a_browser_tag_is()
+    {
+        // Brazil maps to `pt-BR` then `pt`, so a forum with only `pt` installed reaches it by
+        // truncation -- the matcher's second tier, inherited rather than reimplemented. This
+        // is the point of handing country candidates to the same matcher.
+        $detector = $this->detector(['en', 'pt'], ['detection_order' => 'ip_browser']);
+
+        // The fixture dataset holds no Brazilian range, so the country arrives as a CDN header
+        // here -- which is the other half of what `IpCountryLookup` answers with.
+        $request = $this->request(null)->withHeader('CF-IPCountry', 'BR');
+
+        $this->assertSame('pt', $detector->detect($request));
+    }
+
+    public function test_detection_order_falls_back_to_browser_first_when_it_is_not_recognised()
+    {
+        // An unset or nonsense setting is not an error: `browser_ip` is the documented
+        // default and the only sensible reading of a value nobody wrote.
+        foreach (['browser_ip', '', 'nonsense'] as $order) {
+            $detector = $this->detector(['en', 'tr', 'de'], ['detection_order' => $order]);
+
+            $this->assertSame(
+                'de',
+                $detector->detect($this->request('de', '20.30.40.50')),
+                "detection_order: '$order'"
+            );
         }
     }
 
@@ -111,7 +185,8 @@ class LanguageDetectorTest extends TestCase
     {
         // A real LocaleManager and real collaborators: the parser and matcher have no
         // dependencies of their own, and doubling them here would only assert that this
-        // class calls the methods this class calls.
+        // class calls the methods this class calls. The lookup is real too, pointed at the
+        // small fixture dataset IpCountryLookupTest documents.
         $locales = new LocaleManager(new Translator('en'));
 
         foreach ($installed as $code) {
@@ -127,16 +202,24 @@ class LanguageDetectorTest extends TestCase
         return new LanguageDetector(
             new BrowserLanguageParser(),
             new LocaleMatcher($locales),
+            new IpCountryLookup(__DIR__.'/../fixtures/ip-dataset'),
+            new CountryLanguage(),
             new SettingsStub($prefixed),
             $locales
         );
     }
 
-    protected function request(?string $acceptLanguage): ServerRequestInterface
+    protected function request(?string $acceptLanguage, ?string $ip = null): ServerRequestInterface
     {
         $request = new ServerRequest([], [], '/', 'GET');
 
-        return $acceptLanguage === null ? $request : $request->withHeader('Accept-Language', $acceptLanguage);
+        if ($acceptLanguage !== null) {
+            $request = $request->withHeader('Accept-Language', $acceptLanguage);
+        }
+
+        // `ipAddress` is the attribute name `Http\Middleware\ProcessIp` sets, and the only way
+        // the connecting address reaches detection.
+        return $ip === null ? $request : $request->withAttribute('ipAddress', $ip);
     }
 }
 
