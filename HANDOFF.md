@@ -1,17 +1,17 @@
 # Handoff — `huseyinfiliz/language-detection` (Flarum 1.x)
 
-> **Status: Phases 1–4 are complete. Phase 5 (standalone IP lookup) is next — its full work order is §16;
-> start there.** §3 carries the dataset design and the resolution order Phase 5 implements; §15 is now the
-> specification of the middleware Phase 5 plugs a second source into.
+> **Status: Phases 1–5 are complete. Phase 6 (analytics) is next — its full work order is §17;
+> start there.** §6 carries the data model and counting rules Phase 6 implements; §16 is now the
+> specification of the IP lookup Phase 6 takes a country code from.
 > This file exists so a fresh session can resume without re-doing discovery.
 > It is a working document — remove it (or gitignore it) before release.
 >
-> **Repository state, 2026-08-24:** branch `1.x`, pushed to `origin/1.x` through Phase 3 (`702995c`);
-> Phase 4 (`cb43798`) is committed locally and still needs pushing.
-> Phase 4 adds `src/LanguageDetector.php`, `src/Middleware/DetectLanguage.php`,
-> `tests/unit/LanguageDetectorTest.php` and `tests/integration/DetectionTest.php`, and is the first phase that
-> references project classes from `extend.php` — so it is also the first time CI exercises the migration and
-> the extension actually booting.
+> **Repository state, 2026-08-25:** branch `1.x`, pushed to `origin/1.x` through Phase 4 (`cb43798`);
+> Phase 5 (`b5a7567`) is committed locally and still needs pushing.
+> Phase 5 adds `src/IpCountryLookup.php`, `src/CountryLanguage.php`, `scripts/build-ip-data.php`, the
+> generated `resources/ip4.dat` / `ip6.dat` / `ip-data.php`, two new unit test files and the `.dat` fixtures —
+> **2.2 MB of committed binary data**, which is the first push where that matters. It is also the first phase
+> whose behaviour `detection_order` can actually change, so CI now exercises both orders.
 >
 > **Commit convention (standing instruction from the project owner):** author **and** committer are
 > `Hüseyin Filiz <mysuperuser01@gmail.com>`; never add a `Co-Authored-By: Claude … <noreply@anthropic.com>`
@@ -104,9 +104,9 @@ them verbatim.** The extension must ship its own curated English + native names.
 |---|---|
 | `tests/phpunit.unit.xml` | suite is `./unit`, suffix `Test.php`; registers Mockery's `TestListener`, so **Mockery is available**. Needs no `bootstrap` attribute — it is byte-for-byte flarum/testing's own unit config, and `vendor/bin/phpunit` loads the autoloader itself |
 | `tests/phpunit.integration.xml` + `tests/integration/setup.php` | integration suite; needs a real database (`composer test:setup`, run once), so it effectively only runs in CI. `processIsolation="true"`, so each test method gets a fresh process and no singleton leaks between methods |
-| `tests/unit/BrowserLanguageParserTest.php`, `tests/unit/LocaleMatcherTest.php`, `tests/unit/LanguageDetectorTest.php` | Phases 3–4; base class `Flarum\Testing\unit\TestCase` (lowercase `unit` namespace segment, as the vendored class declares it) |
-| `tests/integration/DetectionTest.php` | Phase 4; base class `Flarum\Testing\integration\TestCase`, which defines only `tearDown()` — `parent::setUp()` resolves to PHPUnit's own empty one |
-| `tests/fixtures/.gitkeep` | still an empty placeholder — Phase 5's synthetic `.dat` fixtures land here. `tests/unit/.gitkeep` was removed once real tests existed |
+| `tests/unit/BrowserLanguageParserTest.php`, `tests/unit/LocaleMatcherTest.php`, `tests/unit/LanguageDetectorTest.php`, `tests/unit/IpCountryLookupTest.php`, `tests/unit/CountryLanguageTest.php` | Phases 3–5; base class `Flarum\Testing\unit\TestCase` (lowercase `unit` namespace segment, as the vendored class declares it) |
+| `tests/integration/DetectionTest.php` | Phases 4–5; base class `Flarum\Testing\integration\TestCase`, which defines only `tearDown()` — `parent::setUp()` resolves to PHPUnit's own empty one. **Boots on the first `send()`, not in `setUp()`** — see §12 Phase 5 decision 8 |
+| `tests/fixtures/ip-dataset/{ip4.dat,ip6.dat,ip-data.php}` | Phase 5's hand-built dataset, 36 and 60 bytes; documented as an ASCII table in `IpCountryLookupTest`'s class docblock. The directory name is fixed by `IpCountryLookup`'s filenames. `tests/fixtures/.gitkeep` is gone |
 
 `composer.json` has `require-dev: flarum/testing ^1.0.0` and maps `autoload-dev` PSR-4
 `HuseyinFiliz\LanguageDetection\Tests\` → `tests/`. Scripts: `composer test:unit`, `test:integration`, `test`.
@@ -153,6 +153,12 @@ APIs, no API keys, no runtime downloads. Works for every visitor out of the box.
 
 ### Resolution order in `IpCountryLookup::countryFor(?string $ip): ?string`
 
+> **Superseded in Phase 5 — the signature is `countryFor(ServerRequestInterface $request): ?string`**, with
+> `countryForIp(?string $ip): ?string` for the dataset half alone (§12 Phase 5 decision 1). The *order* below is
+> exactly what was implemented, with one clarification: steps 1 and 2 are reversed in effect, because an edge
+> header is trusted even when the connecting address is private — it is the edge's own verdict about a visitor
+> whose address never reached us (§12 Phase 5 decision 2).
+
 1. **Reject non-public IPs** — empty, malformed, loopback, private, link-local, reserved → `null`.
 2. **Trusted edge / server headers**, when present (free, zero cost, more accurate than any bundled DB):
    `CF-IPCountry` (Cloudflare), `CloudFront-Viewer-Country`, `X-Vercel-IP-Country`, `Fastly-Geo-Country`,
@@ -183,6 +189,10 @@ loaded into PHP memory. Detection runs at most once per visitor anyway (§6), so
 
 Estimated size ≈ 1.4 MB (IPv4, ~230k ranges) + ~0.9 MB (IPv6, ~90k ranges) ≈ **2.3 MB**. Stored raw, not
 gzipped — `fseek` requires it.
+
+> **Measured in Phase 5: the estimate is inverted.** `ip4.dat` is 900,168 bytes (150,028 records) and `ip6.dat`
+> is 1,360,030 bytes (136,003 records) — 2.2 MB in total, but IPv6 is the larger file, because gap records
+> outnumber allocations in a sparsely-delegated address space. See §12 Phase 5 for the full figures.
 
 **Source data: RIR delegated-extended statistics.** Public, freely redistributable, no attribution
 requirement, no EULA:
@@ -305,6 +315,11 @@ signal that drives the missing-languages report, satisfying spec §26 with zero 
 **No Eloquent model.** The query builder via `ConnectionInterface` covers the upsert, the dashboard queries,
 and cleanup; the atomic upsert needs raw SQL regardless. Avoids an extra class and honours §34. Use
 `$db->table('language_detection_stats')` so the table prefix is applied automatically.
+
+> **Corrected in Phase 6's work order — the upsert needs no raw SQL string.** `Builder::upsert()` exists at the
+> locked `illuminate/database` v8.83.27 and a string-keyed `$update` entry whose value is a `Query\Expression`
+> compiles to `` `requests` = requests + 1 `` with the expression stripped from the bindings. §17 has the
+> verified grammar excerpt and the four traps that come with it. The rest of this paragraph stands.
 
 ### Counting
 
@@ -519,6 +534,7 @@ resources/
   languages.php                    (86-entry catalog from .claude/reference/flarum-lang-catalog.tsv)
   countries.php                    (country -> ordered candidate locales)
   ip4.dat  ip6.dat                 (generated; Phase 5)
+  ip-data.php                      (generated sidecar: build date + record counts; Phase 5)
 scripts/build-ip-data.php          (maintainer-only regeneration; never runs at runtime)
 src/
   BrowserLanguageParser.php  LocaleMatcher.php  CountryLanguage.php
@@ -532,7 +548,9 @@ less/admin.less
 js/src/admin/index.ts
 js/src/admin/components/LanguageDetectionPage.tsx  (+ StatsCards, LanguagesTable,
                                                     MissingLanguages, CountriesTable, TrendChart, SettingsTab)
-tests/unit/{BrowserLanguageParserTest,LocaleMatcherTest,LanguageDetectorTest,IpCountryLookupTest}.php
+tests/unit/{BrowserLanguageParserTest,LocaleMatcherTest,LanguageDetectorTest,IpCountryLookupTest,
+            CountryLanguageTest,BotDetectorTest}.php
+tests/fixtures/ip-dataset/{ip4.dat,ip6.dat,ip-data.php}   (hand-built; Phase 5)
 tests/integration/{DetectionTest,StatisticsTest}.php
 ```
 
@@ -669,12 +687,107 @@ was done: every API the new code touches was re-read in `vendor/` (`SetLocale`, 
 UTF-8 without BOM, LF endings, no tabs, no trailing whitespace, final newline, balanced braces/parens, `! `
 spacing, alphabetical imports.
 
-**Phase 5 — Standalone IP lookup. ← NEXT. Full work order in §16.** `IpCountryLookup` (private-IP rejection →
-edge headers → binary search); `scripts/build-ip-data.php`; generate and spot-check `ip4.dat` / `ip6.dat`;
-`CountryLanguage`. Unit tests with a small synthetic `.dat` fixture rather than the shipped 2.3 MB files.
+**Phase 5 — Standalone IP lookup. ✅ DONE.** Work order in §16, followed with three deviations (decisions 1, 7
+and 8 below).
+Built: `src/IpCountryLookup.php`, `src/CountryLanguage.php`, `scripts/build-ip-data.php`, the generated
+`resources/ip4.dat` / `resources/ip6.dat` / `resources/ip-data.php`, `tests/unit/IpCountryLookupTest.php`
+(18 tests), `tests/unit/CountryLanguageTest.php` (8 tests), `tests/fixtures/ip-dataset/{ip4.dat,ip6.dat,ip-data.php}`,
+plus the seam in `src/LanguageDetector.php`, 7 new tests in `tests/unit/LanguageDetectorTest.php`, 6 new tests in
+`tests/integration/DetectionTest.php`, and the `.dat` rules in `.gitattributes`. `extend.php` is **unchanged** —
+see decision 3.
 
-**Phase 6 — Analytics.** Atomic daily upsert, request counting, cookie-date unique counting, country codes,
-bot filtering, `enable_analytics` honoured. Tests including bot exclusion and analytics-disabled.
+Decisions taken during Phase 5:
+
+1. **`countryFor()` takes the request, not the IP** — `countryFor(ServerRequestInterface $request): ?string`,
+   with a second `countryForIp(?string $ip): ?string` for the dataset path alone. §16 left the signature as a
+   judgement call. One argument won because the edge headers, the server params and the `ipAddress` attribute
+   all live on the request, so a two-argument form would have let a caller pass an address that disagreed with
+   the request it came from. `countryForIp()` exists because it is the half worth testing in isolation, and
+   because it is the half with no HTTP in it.
+2. **Edge headers are read *before* the address, not as a fallback.** §3 already ordered them this way and Phase
+   5 confirms why it is not merely an optimisation: Flarum 1.x honours no `X-Forwarded-For`, so behind a CDN
+   `ipAddress` is the CDN's own address, and a dataset lookup on it would return the *CDN's* country with total
+   confidence. The header is the only thing that knows where the visitor is. Consequence, deliberately: a
+   spoofed header beats a real address. Documented in the class, and the stakes are unchanged from
+   `Accept-Language`, which a visitor can already set to anything.
+3. **No container binding was needed, so `extend.php` was not touched.** Both new classes take a single
+   `?string $directory = null` / `?string $path = null` constructor argument, and Laravel's
+   `resolvePrimitive()` fills an unresolvable primitive from its default rather than throwing, so
+   `$container->make(LanguageDetector::class)` autowires the whole 6-argument chain as-is. That nullable
+   argument is also the test seam — no `Extend\ServiceProvider`, no bind closure, nothing to keep in sync.
+4. **Keys are compared as raw big-endian bytes with `strcmp()`, never unpacked.** §16 flagged the trap and it is
+   real, but be precise about its status: **no key in the shipped `ip6.dat` is at or above `8000::`** (the
+   highest is `2c0f:fff1::`), and every address that high today is in `fc00::/7` or `fe80::/10` and is rejected
+   by the private/reserved filter before the search runs. So the bug is *latent*, not live — which is exactly
+   why `tests/fixtures/ip-dataset/ip6.dat` carries a synthetic `9000:: => TR` record and
+   `test_an_ipv6_address_above_8000_is_not_read_as_negative` asserts on it. Any future dataset that does reach
+   that high finds the test already in place.
+5. **IPv4-mapped IPv6 is unwrapped *before* the private/reserved filter.** `::ffff:0:0/96` is itself a reserved
+   prefix, so filtering first would discard every dual-stack visitor whose address arrives in mapped form.
+   Unwrapping first is also what makes `::ffff:192.168.1.1` recognisably private rather than merely reserved.
+6. **`\0\0` and "no country in the map" are the same answer to the caller.** `fromIp()` returns `null` for an
+   unknown range, an unmapped country, and a country whose languages are not installed, without distinguishing
+   them — they all mean "this source has no opinion, run the next one". Phase 7's missing-languages report is
+   the place that will care about the difference, and it will have the country code to work from.
+7. **Deviation — fixtures live in `tests/fixtures/ip-dataset/`, not as `ip4-test.dat` / `ip6-test.dat`.**
+   §16's flat filenames are unreachable: the seam is the *directory*, and `FILE_V4` / `FILE_V6` / `FILE_INFO`
+   are fixed names inside it. A directory of correctly-named files also makes two more paths testable — the
+   sidecar (`datasetInfo()`) and a missing dataset (point the constructor at a directory that does not exist).
+   `tests/fixtures/.gitkeep` was deleted, as §16 anticipated.
+8. **Deviation — the integration suite's boot moved out of `setUp()`.** `setting()` is seeded through
+   `SetSettingsBeforeBoot` and is a documented no-op once the app is booted, and Phase 4's `setUp()` called
+   `$this->localeManager()`, which boots. So the one test §16 called "the only assertion that `detection_order`
+   does anything at all" could not have worked as written. Fixed by moving the `forumDefault` read and the two
+   `addLocale()` calls into an overridden `send()` behind a `$booted` flag: boot now happens on the first
+   request, after any `setting()` call. **All 7 pre-existing tests are byte-identical** — the change is in the
+   harness around them.
+9. **`REMOTE_ADDR` cannot be set on an integration request, so the dataset path is untested at the HTTP level.**
+   `request()` builds `new ServerRequest([], [], $path, $method)` with empty server params, and PSR-7 has no
+   `withServerParams()` — so `ProcessIp` always yields its `127.0.0.1` default and no integration test can
+   exercise a real address. §16 asked only for the edge-header path, which is fortunate rather than lucky. The
+   dataset path is covered at the unit level, where the request is built by hand; the `XX` test documents the
+   `127.0.0.1` consequence explicitly so nobody later reads it as a dataset assertion.
+10. **The `.dat` files are marked `binary` in `.gitattributes`, and the block sits *after* the `text=auto`
+    catch-all** — the last matching line wins, and the first attempt at this put the block above it, where
+    `git check-attr` duly reported `text: auto`. Git's own NUL heuristic would have reached the same conclusion,
+    but a fixed-offset record boundary is not a thing to leave to a heuristic in a repo with
+    `core.autocrlf=true`. Verified after the fix: `.dat` files report `text: unset, diff: unset`, `.php` files
+    still report `text: auto`, and every staged `.dat` blob is byte-identical to the file on disk
+    (`git hash-object --no-filters` matches `git rev-parse :<path>`).
+11. **A wrong test, not wrong data.** The `CountryLanguageTest` shape sweep initially flagged
+    `AR => ['es_AR','es']` and `MX => ['es_MX','es']` as malformed. `src/LocaleMatcher.php`'s own docblock
+    already records that Flarum publishes those two pack codes with underscores where `pt-BR` uses a hyphen, and
+    that `normalize()` folds the separator on both sides. The regex was corrected to accept either separator;
+    `resources/countries.php` was **not** touched. Worth stating because the tempting fix was the wrong one.
+
+**Dataset facts** (the generated files, not the code): `ip4.dat` is 900,168 bytes / 150,028 records / 7,558
+`\0\0` gap records / 239 countries, first record `0.0.0.0 => \0\0`, last `224.0.0.0 => \0\0`. `ip6.dat` is
+1,360,030 bytes / 136,003 records / 67,297 gaps / 232 countries, first `:: => \0\0`, last
+`2c0f:fff1:: => \0\0`. **§3's and §16's size estimates are inverted relative to reality** — they predicted
+~1.4 MB for IPv4 and ~0.9 MB for IPv6; it is the other way round, and 2.2 MB in total rather than 2.3 MB. The
+sidecar records `built`/`data_date` `2026-08-24`, the five registries, and both record counts.
+
+**Verification actually performed:** the PHP was **not executed** — there is still no PHP in this environment,
+so all four touched test files and all three new source files are **unverified until CI runs**, and the
+integration suite additionally needs MySQL. The `.dat` files, however, are *data*, and data can be checked here.
+What was done, with a throwaway perl mirror of the reader (never committed):
+
+- **All nine §16 spot-check pairs pass**, plus three more: `8.8.8.8`→`US`, `212.156.4.1`→`TR`, an APNIC
+  range→`CN`, `2606:4700::`→`US`, `2a01:4f8::1`→`DE`, `::ffff:8.8.8.8`→`US` (unwrapping), and both edges of both
+  files.
+- **A full sweep of both files** proved every record byte-aligned, keys strictly ascending with no duplicates,
+  no two adjacent records carrying the same country (the merge step works), and no malformed country codes.
+- **Both fixtures verified by hex dump** against the ASCII table in `IpCountryLookupTest`'s class docblock.
+- Structural checks as in earlier phases: UTF-8 without BOM, LF endings, no tabs, no trailing whitespace, final
+  newline, `! ` spacing per `.styleci.yml`, alphabetical imports.
+
+None of that says anything about the PHP. The perl mirror agreeing with the perl-built data proves the
+*algorithm and the dataset*, not one line of `IpCountryLookup.php` — and `scripts/build-ip-data.php` remains
+entirely unrun (§13 risk 1).
+
+**Phase 6 — Analytics. ← NEXT. Full work order in §17.** Atomic daily upsert, request counting, cookie-date
+unique counting, country codes, bot filtering, `enable_analytics` honoured. Tests including bot exclusion and
+analytics-disabled.
 
 **Phase 7 — Missing languages.** `LanguageCatalog` diffing requested locales against
 `LocaleManager::getLocales()`, sorted by request volume, with a "View language package" link.
@@ -693,10 +806,11 @@ tests, README (privacy section is mandatory), CHANGELOG. **Do not begin the Flar
 
 ## 13. Open risks
 
-1. **`scripts/build-ip-data.php` is unverified** until run under real PHP; the initial `.dat` files are
-   generated here via perl. Confirm parity before release.
-2. **Dataset freshness** — RIR data drifts. Needs periodic regeneration and a release; the admin notice
-   should surface the build date.
+1. **`scripts/build-ip-data.php` is unverified** until run under real PHP; the committed `.dat` files were
+   generated here with a throwaway perl port and verified as *data* (§12 Phase 5). Parity between the two
+   implementations is unproven. Confirm byte-identical output before release.
+2. **Dataset freshness** — RIR data drifts. Needs periodic regeneration and a release; `resources/ip-data.php`
+   carries the build date and `admin.ip_data.notice` surfaces it (Phase 8).
 3. **Nothing can be built or tested locally** (no PHP/Node). CI is the only gate.
 4. **RIR precision** is registrant-level and coarser than commercial DBs. Acceptable for language selection;
    DB-IP Lite is the documented upgrade path if it proves insufficient.
@@ -706,6 +820,17 @@ tests, README (privacy section is mandatory), CHANGELOG. **Do not begin the Flar
    is `preg_match('/^[a-z0-9@_\.\-]*$/i', $locale)`. Underscores, hyphens and mixed case are all accepted, so
    `es_MX` and `zh-Hans` pass. Phase 4 can call `setLocale()` with any key `getLocales()` returns without
    guarding it.
+7. **`ip6.dat` keys on the top 64 bits only** (§3's design). An allocation of /64 or longer collapses to a
+   single key, so two countries holding different halves of one /64 cannot be distinguished — the first wins.
+   No registry publishes a prefix longer than /64 today, `rangeV6()` handles the case deliberately rather than
+   by accident, and the failure mode is one UI language, so this is recorded rather than fixed.
+8. **The IPv6 signed-integer trap is latent, not fixed-and-proven-in-production.** No shipped key reaches
+   `8000::` and every address that high is filtered as private or reserved before the search, so the regression
+   test rests on a synthetic fixture record (§12 Phase 5 decision 4). If a future dataset reaches that high, the
+   test is already there — but nothing in the real data exercises it today.
+9. **The dataset path has no end-to-end coverage.** Integration tests cannot set `REMOTE_ADDR` (§12 Phase 5
+   decision 9), so "a real address resolves to a country through the middleware" is asserted only at the unit
+   level. The edge-header path is covered end to end.
 
 ---
 
@@ -1045,12 +1170,14 @@ the status header above.
 
 ---
 
-## 16. Phase 5 work order — standalone IP lookup (**← START HERE**)
+## 16. Phase 5 work order — ✅ implemented, kept as the IP lookup's specification
 
-> Self-contained on purpose: a fresh session should be able to build Phase 5 from this section plus the
-> cross-references below, without re-doing discovery. API claims marked *verified* were read out of
-> `vendor/flarum/core` or `vendor/flarum/testing` at 1.8.19; everything about the dataset is design, and Phase 5
-> is the phase that first proves it.
+> **Phase 5 is done** (§12 records what was built, the eleven decisions taken, the dataset facts, and exactly
+> what was and was not verified). This section is retained because it is still the authoritative statement of
+> the lookup's resolution order, the binary-search trap and the generator's contract — Phase 10's review should
+> check the code against it, and Phase 6 takes a country code from the class described here. Do not
+> re-implement it. **Three things below were deviated from**, all recorded in §12: the `countryFor()` signature
+> (decision 1), the fixture paths (decision 7), and where the integration suite boots (decision 8).
 
 **Read first, in this order:** §3 in full (why `fof/geoip` is out, the resolution order, the binary dataset
 design, the country→language map **and** the `en` correction box), §15 (the `LanguageDetector` seam this plugs
@@ -1226,3 +1353,261 @@ plainly that they say nothing about the PHP.
 Finish by adding a `CHANGELOG.md` line under `## [Unreleased] / ### Added`, then commit per the convention in
 the status header above. Close Phase 5 out the way every phase closes: record what was built and decided in
 §12, and write the Phase 6 work order as §17.
+
+---
+
+## 17. Phase 6 work order — analytics (**← START HERE**)
+
+> Self-contained on purpose: a fresh session should be able to build Phase 6 from this section plus the
+> cross-references below, without re-doing discovery. API claims marked *verified* were read out of
+> `vendor/` on 2026-08-25 at the locked versions (`flarum/core` 1.8.19, `illuminate/database` **v8.83.27**).
+> Two of them **correct §6**, which was written before the vendor tree was readable — read the corrections
+> before writing any SQL.
+
+**Read first, in this order:** §6 in full (the table, the counting rules, the cookies, and the two corrections
+below), §10 (`enable_analytics`, `ignore_bots`), §1's privacy constraints (which are the hard boundary of this
+phase), §15 (the middleware Phase 6 restructures), §16 (the lookup Phase 6 takes a country code from).
+
+**Goal:** the extension starts *reporting* as well as deciding. Every forum page view contributes to one
+aggregated daily row, so Phase 7 can diff requested languages against installed ones and Phase 8 can draw the
+dashboard. Nothing identifying is written anywhere: the visitor's IP, User-Agent and `Accept-Language` are all
+read, used within the request, and dropped.
+
+### Scope discipline — what Phase 6 must NOT touch
+
+- **No admin UI, no API endpoints, no new `locale/*.yml` keys.** Phase 8 owns the dashboard and Phase 7 the
+  missing-languages report. Phase 6 writes rows; it does not read them back for anybody. Resist adding a
+  `Statistics` query class "while you are here" — that is §11's `src/Statistics.php` and it belongs to Phase 8,
+  which knows what the dashboard actually needs.
+- **No cleanup, no retention enforcement, no console command.** Phase 9. `retention_days` is a setting Phase 6
+  reads *never*.
+- **No second table, no Eloquent model.** §6 and spec §34: exactly one table, driven by the query builder.
+- **Do not change `BrowserLanguageParser`, `LocaleMatcher`, `IpCountryLookup`, `CountryLanguage` or
+  `LanguageDetector`.** §14, §15 and §16 are their specifications and Phases 7–8 depend on those contracts.
+  Phase 6 *consumes* them. `Middleware/DetectLanguage` is the one existing file that changes, and §15 stays its
+  specification for everything except where the counting hooks in.
+- **Never store an identifier.** No visitor ID, no hashed IP, no "anonymised" IP, no UA string, no raw header,
+  no URL, no referrer. The `unique_visitors` count comes from a cookie carrying a **bare date** and nothing
+  else. If a design seems to need more than that, it is the wrong design.
+
+### Deliverables
+
+```
+src/Analytics.php                      (the recorder: one public method, one atomic write)
+src/BotDetector.php                    (User-Agent substring match, read and discarded)
+src/Middleware/DetectLanguage.php      (edit: count on every page view, not only when detection runs)
+tests/unit/BotDetectorTest.php
+tests/unit/AnalyticsTest.php           (optional — see "Tests" for what is and is not worth unit-testing)
+tests/integration/StatisticsTest.php
+CHANGELOG.md
+```
+
+`extend.php` needs **no change**: `Illuminate\Database\ConnectionInterface` is registered as a container
+**singleton** with aliases `db.connection` and `flarum.db` (*verified* —
+`vendor/flarum/core/src/Database/DatabaseServiceProvider.php:51-58`), so plain constructor injection resolves it,
+and the middleware is already registered. Do not add a service provider.
+
+### Correction to §6 — the atomic upsert needs **no raw SQL string**
+
+§6 says "the atomic upsert needs raw SQL regardless". That was written before `vendor/` was readable and is
+wrong. `Illuminate\Database\Query\Builder::upsert(array $values, $uniqueBy, $update = null)` exists at
+v8.83.27 (*verified* — `Query/Builder.php:3116`), and MySQL's grammar compiles it to
+`insert … on duplicate key update …` (*verified* — `Query/Grammars/MySqlGrammar.php::compileUpsert`). The part
+that makes an atomic **increment** possible:
+
+```php
+$columns = collect($update)->map(function ($value, $key) {
+    return is_numeric($key)
+        ? $this->wrap($value).' = values('.$this->wrap($value).')'
+        : $this->wrap($key).' = '.$this->parameter($value);
+})->implode(', ');
+```
+
+So a **string-keyed** `$update` entry emits `` `col` = ? `` — and `Grammar::parameter()` is
+`isExpression($value) ? $this->getValue($value) : '?'`, while `Builder::cleanBindings()` rejects every
+`Expression` from the binding list (*both verified*). Therefore:
+
+```php
+$db->table('language_detection_stats')->upsert(
+    [
+        'date'            => $date,
+        'locale'          => $locale,
+        'country_code'    => $country,     // '' when unknown
+        'requests'        => 1,
+        'unique_visitors' => $newVisitor,  // 1 or 0
+        'created_at'      => $now,
+        'updated_at'      => $now,
+    ],
+    ['date', 'locale', 'country_code'],
+    [
+        'requests'        => $db->raw('requests + 1'),
+        'unique_visitors' => $db->raw('unique_visitors + '.(int) $newVisitor),
+        'updated_at'      => $now,
+    ]
+);
+```
+
+compiles to one statement, increments in the database rather than in PHP, and is race-free under concurrency —
+which read-then-write would not be. Four notes, each a real trap:
+
+1. **`$uniqueBy` is ignored by the MySQL grammar** — `compileUpsert()` never references it, because
+   `on duplicate key update` fires on whatever unique keys the table has. Pass the real columns anyway: they are
+   the documentation of *which* index this relies on, and other grammars do use them.
+2. **`(int)` cast, not string interpolation on trust.** An `Expression` is spliced into the SQL verbatim and
+   cannot carry a binding, so `unique_visitors + ?` is not available here. The cast is what makes the
+   interpolation provably safe; write it that way and say why in a comment, so a later reader does not "fix" it
+   into an injection.
+3. **Timestamps are not managed for you.** The query builder does not touch `created_at`/`updated_at` (that is
+   Eloquent), and the migration declares both nullable with no default — so set them explicitly in both the
+   insert values and the update map, or every row ships with nulls.
+4. **Do not use the numeric-key form of `$update`.** It emits `values(col)`, which MySQL 8.0.20 deprecates. The
+   string-keyed form above avoids `values()` entirely.
+
+### Correction to §6 — what goes in the `locale` column, and the length trap
+
+§6 is right that stats store the **requested** locale, not the resolved one — that is the whole mechanism behind
+`fallback = SUM(requests) WHERE locale NOT IN (installed locales)` and behind Phase 7's report. So the value is
+the visitor's **most-preferred parsed tag**: `$parser->parse($request->getHeaderLine('Accept-Language'))[0]`,
+not what `LanguageDetector` resolved it to. Getting this backwards would make the missing-languages report
+structurally incapable of ever finding anything.
+
+Two things §6 does not say:
+
+- **`locale` is `string(20)` NOT NULL** (*verified* — the migration). `BrowserLanguageParser`'s shape regex is
+  `/^[A-Za-z]{1,8}([-_][A-Za-z0-9]{1,8})*$/` with no overall length bound (§14 rule 7), so a crafted header can
+  yield a valid-shaped tag of 26+ characters. Under MySQL strict mode that is an error, not a truncation, and it
+  would surface as a 500 on a page view. **Skip any tag longer than 20 bytes** rather than truncating it — a
+  truncated tag is a fabricated language code that would then appear in the admin's missing-languages report.
+- **Normalize for aggregation, or the dashboard is noise.** `tr`, `TR`, `tr-TR` and `tr_TR` are four rows
+  otherwise. Fold to lowercase with `_` → `-` (the same rule `LocaleMatcher::normalize()` applies, which is why
+  this is consistent rather than a second convention) — but **do not** reach into `LocaleMatcher` for it; §14
+  forbids changing that class and its normalizer is not part of its public contract. A one-line
+  `strtolower(str_replace('_', '-', $tag))` in `Analytics` is the honest duplication.
+- **A visitor who requested nothing** (no `Accept-Language`, or every tag dropped) still viewed a page. Record
+  them with `locale = ''`, matching `country_code`'s "`''` means unknown" convention, so totals stay truthful
+  and the row is distinguishable from any real language. Note the consequence for Phase 7: `''` is not a missing
+  language and must be excluded from that report explicitly.
+
+### `Analytics`
+
+```php
+public function __construct(
+    ConnectionInterface $db,
+    BrowserLanguageParser $parser,
+    IpCountryLookup $lookup,
+    BotDetector $bots,
+    SettingsRepositoryInterface $settings
+) {}
+
+/** @return bool whether this visitor was counted as new today (the caller writes the day cookie) */
+public function record(ServerRequestInterface $request, bool $isNewVisitor): bool;
+```
+
+The exact shape is a judgement call — decide once and say so in the commit message — but two things are not:
+
+1. **`enable_analytics` is checked first and short-circuits everything.** Off means no parse, no lookup, no
+   query, and no day cookie. A forum with analytics disabled must issue exactly the same number of statements as
+   one without this extension.
+2. **`ignore_bots` is checked before the write, not after.** A bot's language is still detected (§10's help text
+   promises exactly that: "Their language is still detected, it is just not counted"), so the bot check belongs
+   here in the recorder and **must not** be added to `LanguageDetector`.
+
+`BrowserLanguageParser` is injected rather than reusing whatever `LanguageDetector` parsed. Parsing twice is pure
+string work with no I/O, and the alternative — widening `LanguageDetector`'s contract to hand back its
+intermediate state — would break §15 for a saving of nothing.
+
+**The country code costs a second lookup per page view.** Detection runs at most once per visitor (§6), but
+counting runs on every view, so `IpCountryLookup::countryFor()` now runs on every view too. That is ~18 `fseek`s
+against an OS-page-cached file, which is genuinely cheap — but it is no longer *zero*, so measure the claim
+before repeating it. **Do not "optimise" it by caching the country in the day cookie:** the cookie is a bare
+date on purpose (§1, and `enable_analytics_help`'s promise to admins), and a cookie carrying date + country is a
+meaningfully larger privacy surface for a saving of a few file seeks.
+
+### `BotDetector`
+
+```php
+public function isBot(?string $userAgent): bool;
+```
+
+Case-insensitive substring match against a static list (§6): `bot`, `crawler`, `spider`, `slurp`,
+`bingpreview`, `facebookexternalhit`, `headlesschrome`, `curl`, `wget`, `python-requests`, and similar. The UA
+comes from `$request->getHeaderLine('User-Agent')`, is tested, and is **never stored** — not in the database, not
+in a log, not in a cookie.
+
+**Known false positive, and why it is acceptable.** A bare `bot` substring matches real device names —
+`CUBOT_NOTE_20` is a real Android phone that appears in real UAs — so some genuine visitors will go uncounted.
+The consequence is one missing row increment in an approximate statistic that §6 already documents as
+approximate, whereas the consequence of *missing* a bot is inflated numbers an admin might act on. Either keep
+the bare token and document the false positive, or tighten it (`bot/`, `bot;`, `+http`, `-bot`) and document what
+that lets through. **Do not** leave the tradeoff unstated — and write the test either way: an empty UA, a null
+UA, a real Chrome UA, a real Googlebot UA, and the `CUBOT` case with whichever answer you chose asserted
+deliberately.
+
+### The middleware restructure
+
+Today `DetectLanguage::process()` short-circuits: a user with a locale preference and a guest with a memo cookie
+both return early, before any detection. **Counting must not sit behind either short-circuit** — §6 counts *page
+views*, and the visitors who return early are precisely the repeat visitors who make up most of the traffic.
+Counting only on first visits would undercount by roughly the whole returning population and quietly invert
+every trend on the dashboard.
+
+So `process()` becomes: GET guard → the existing detect/apply/remember branches, which return the response →
+then the analytics step, which may add the day cookie to that response. Keep the two concerns visibly separate
+(the existing `forUser()`/`forGuest()` are fine as they are; wrap rather than thread a flag through them), and
+keep both cookie writes composing — `FigResponseCookies::set()` returns a new response, so the memo cookie and
+the day cookie must be applied in sequence to the *same* response object, not to two.
+
+**The day cookie** (§6): name `language_detection_day` through `CookieFactory`, so
+`flarum_language_detection_day` on the wire, 1 year, holding today's date and nothing else. Read it with
+`Arr::get($request->getCookieParams(), $this->cookies->getName(…))`; if the value is not today's date,
+`unique_visitors` is incremented and the cookie is rewritten. **Validate it on read** the way Phase 4 validates
+the locale memo (§12 Phase 4 decision 3) — an arbitrary cookie value must never reach a comparison that decides
+a database write, and a tampered value should simply read as "not today".
+
+Date handling: use one `Carbon::now()` for the whole request and derive both the `date` column and the cookie
+value from it, so a request crossing midnight cannot write a row for one day and a cookie for another. The
+dashboard groups by the same column, so whatever timezone PHP is configured with, the data is self-consistent.
+
+### Tests
+
+**`BotDetectorTest`** — as listed above. Pure, fast, and the one class here with no dependencies at all.
+
+**`AnalyticsTest` is optional and should be honest about it.** `Analytics` exists to issue one SQL statement;
+asserting that with a mocked `ConnectionInterface` tests the mock's expectations, not the SQL, and would pass
+just as happily against a statement MySQL rejects. What *is* worth a unit test is the pure decision-making
+around the write: `enable_analytics = '0'` issues nothing (assert the connection is never touched — Mockery is
+available per §2), a bot is not counted when `ignore_bots = '1'` but is when it is `'0'`, an over-long tag is
+skipped, `tr_TR` and `TR` both normalize to `tr-tr`/`tr`, and a request with no header records `''`. Write those;
+skip the SQL assertions.
+
+**`tests/integration/StatisticsTest.php`** — a new file, because `DetectionTest` is about what the visitor sees
+and this is about what the database holds. Extend `Flarum\Testing\integration\TestCase`, and **copy Phase 5's
+deferred-boot pattern verbatim** (§12 Phase 5 decision 8): `setting()` is a no-op after boot, and this suite
+needs `enable_analytics`/`ignore_bots` set per test. Read rows back through `$this->database()->table(…)` rather
+than through any code this extension ships, so the test cannot be satisfied by a bug shared with the writer.
+
+Cases: one page view writes one row with `requests = 1`, `unique_visitors = 1`, the requested locale and `''`
+country; **two views in one test increment `requests` to 2 and leave `unique_visitors` at 1** (the second request
+must carry the first response's cookies — and re-read §12 Phase 4 decision 6 before asserting anything about
+`lang` on a second `send()`, though row assertions are unaffected); a view with `CF-IPCountry: TR` writes
+`country_code = 'TR'`; a view with `Accept-Language: ja` on a forum without Japanese still writes a `ja` row
+(this is the row Phase 7's report is built on, and the single most valuable assertion in the file); a bot UA
+writes nothing under `ignore_bots = '1'`; `enable_analytics = '0'` writes nothing at all; and a request with no
+`Accept-Language` writes a `''` locale row rather than no row. Assert on `$this->database()->table(…)->count()`
+as well as on values, so "wrote two rows instead of incrementing one" fails loudly — that is the exact failure
+mode the unique index exists to prevent, and the one a `where()->first()` assertion would sail straight past.
+
+### Verification available in this environment
+
+Unchanged and still binding: **there is no PHP here**, so nothing can be executed — no phpunit, no `php -l`. CI
+is the only gate. **Never state or imply that the tests pass.** Report what was written and that it is
+unverified until CI runs. Phase 6 is additionally the first phase whose core behaviour is *database* behaviour,
+so note plainly that the upsert's atomicity and the unique index's dedupe are unexercised until the integration
+suite runs against real MySQL in CI — no amount of local reading proves them. Structural checks that *are*
+possible, as in every earlier phase: UTF-8 without BOM, LF endings, no tabs, no trailing whitespace, final
+newline, balanced braces/parens, `! ` spacing, alphabetical imports, and StyleCI conformance by eye against
+`.styleci.yml`.
+
+Finish by adding a `CHANGELOG.md` line under `## [Unreleased] / ### Added`, then commit per the convention in
+the status header above. Close Phase 6 out the way every phase closes: record what was built and decided in
+§12, and write the Phase 7 work order as §18.
