@@ -44,3 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   days filled in; the second returns the missing-languages report. Requests are split three
   ways -- served, unserved, and visitors who stated no language preference at all -- so the
   totals add up without the largest bucket on most forums being miscounted as unserved.
+- An admin page in place of the usual settings modal, over five tabs: an overview of the
+  seven headline figures with a day-by-day bar chart, every language visitors asked for
+  with whether the forum could serve it, the missing-languages report with the package
+  that would fix each row, where visitors came from, and the settings themselves. The
+  window is 7, 30 or 90 days and both endpoints are re-read together, so no figure on the
+  page is ever describing a different period from the one beside it. Countries are named
+  in the administrator's own language where the browser can do it, and fall back to their
+  two-letter code where it cannot.

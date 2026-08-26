@@ -1,5 +1,9 @@
 import app from 'flarum/admin/app';
 
+import LanguageDetectionPage from './components/LanguageDetectionPage';
+
 app.initializers.add('huseyinfiliz-language-detection', () => {
-  // TODO: register the Language Detection admin page.
+  // Replaces the settings modal core would otherwise generate. Everything the extension does -- the
+  // statistics, the missing languages and the five settings -- lives on that one page.
+  app.extensionData.for('huseyinfiliz-language-detection').registerPage(LanguageDetectionPage);
 });

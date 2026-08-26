@@ -1,0 +1,338 @@
+// Language Detection admin page.
+//
+// Everything is nested inside `.LanguageDetectionPage` so that the generic-looking class names here
+// -- `.CardList`, `.Button-badge` -- cannot reach anything outside this one page, whatever core or
+// another extension happens to call its own.
+//
+// Colours are read as CSS custom properties with a LESS variable behind them, so a theme that sets
+// the property is honoured and one that does not still gets a value. The two exceptions are the
+// served/not-served pills: pairing a core variable of unknown value with a hand-picked text colour
+// can produce an unreadable pair, so those four colours are literals. They assume a light admin
+// area, which is what core 1.x ships; a dark admin theme would override those two rules.
+
+.language-detection-card() {
+  background: var(--body-bg, @body-bg);
+  border: 1px solid var(--control-bg, @control-bg);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.LanguageDetectionPage {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+
+  // Tabs on the left, the 7/30/90 window on the right, wrapping onto two rows when there is no room
+  // for both.
+  .LanguageDetection-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .LanguageDetection-tabs,
+  .LanguageDetection-windows {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+
+    .Button {
+      border-radius: 999px;
+      background: transparent;
+      box-shadow: none;
+      color: var(--muted-color, @muted-color);
+
+      &:hover {
+        background: var(--control-bg, @control-bg);
+      }
+
+      &.active {
+        background: var(--control-bg, @control-bg);
+        color: var(--heading-color, @heading-color);
+        font-weight: 600;
+      }
+    }
+  }
+
+  // How many rows the tab holds, beside its name.
+  .Button-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--control-bg, @control-bg);
+    color: var(--control-color, @control-color);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+  }
+
+  .LanguageDetection-content {
+    .language-detection-card();
+
+    padding: 24px;
+    // Enough that switching tabs does not move the tab bar up and down under the cursor.
+    min-height: 400px;
+  }
+
+  .LanguageDetection-notice {
+    margin: 0 0 20px;
+    padding: 12px 16px;
+    border-radius: 6px;
+    border-left: 3px solid var(--muted-color, @muted-color);
+    background: var(--control-bg, @control-bg);
+    color: var(--text-color, @text-color);
+  }
+
+  .LanguageDetection-section + .LanguageDetection-section {
+    margin-top: 32px;
+  }
+
+  .LanguageDetection-section-title {
+    margin: 0 0 4px;
+    font-size: 16px;
+  }
+
+  .LanguageDetection-section > .helpText {
+    margin: 0 0 16px;
+  }
+
+  // The summary cards
+  // ----------------------------------------------------------------------------------------------
+
+  .LanguageDetection-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+
+  .LanguageDetection-card {
+    .language-detection-card();
+
+    padding: 16px;
+  }
+
+  .LanguageDetection-card-value {
+    color: var(--heading-color, @heading-color);
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .LanguageDetection-card-share {
+    margin-left: 6px;
+    color: var(--muted-color, @muted-color);
+    font-size: 13px;
+    font-weight: 400;
+  }
+
+  .LanguageDetection-card-label {
+    margin-top: 4px;
+    color: var(--text-color, @text-color);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .LanguageDetection-card-help {
+    margin-top: 4px;
+    color: var(--muted-color, @muted-color);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  // The tables
+  // ----------------------------------------------------------------------------------------------
+
+  .CardList {
+    // The name column takes the slack and every column after it is an equal share. `--grid-tail` is
+    // the count of those later columns rather than the total, because `repeat()` takes an integer
+    // and `repeat(calc(var(--total) - 1), 1fr)` is not valid CSS.
+    --grid-tail: 3;
+
+    &.CardList--cols-3 {
+      --grid-tail: 2;
+    }
+
+    &.CardList--cols-4 {
+      --grid-tail: 3;
+    }
+  }
+
+  .CardList-header,
+  .CardList-row {
+    display: grid;
+    grid-template-columns: 2fr repeat(var(--grid-tail, 3), 1fr);
+    gap: 12px;
+    align-items: center;
+    padding: 10px 12px;
+  }
+
+  .CardList-header {
+    border-bottom: 1px solid var(--control-bg, @control-bg);
+    color: var(--muted-color, @muted-color);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .CardList-row {
+    border-radius: 6px;
+
+    &:nth-child(odd) {
+      background: fade(#000, 2%);
+    }
+  }
+
+  .CardList-number {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .LanguageDetection-name {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: baseline;
+    min-width: 0;
+  }
+
+  .LanguageDetection-native,
+  .LanguageDetection-variants {
+    color: var(--muted-color, @muted-color);
+    font-size: 12px;
+  }
+
+  .LanguageDetection-variants {
+    flex-basis: 100%;
+  }
+
+  .LanguageDetection-code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--control-bg, @control-bg);
+    color: var(--muted-color, @muted-color);
+    font-size: 11px;
+  }
+
+  .LanguageDetection-status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .LanguageDetection-status--served {
+    color: #1f7a45;
+    background: fade(#1f7a45, 12%);
+  }
+
+  .LanguageDetection-status--unserved {
+    color: #b3261e;
+    background: fade(#b3261e, 12%);
+  }
+
+  .LanguageDetection-pack code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--control-bg, @control-bg);
+    font-size: 12px;
+  }
+
+  .LanguageDetection-noPack {
+    color: var(--muted-color, @muted-color);
+    font-size: 12px;
+  }
+
+  // The chart
+  // ----------------------------------------------------------------------------------------------
+
+  .LanguageDetection-chart {
+    margin-top: 16px;
+  }
+
+  // Fixed height, full width: the SVG's own geometry is stretched to fit by
+  // `preserveAspectRatio="none"`, so there is nothing to keep in proportion.
+  .LanguageDetection-chart-svg {
+    display: block;
+    width: 100%;
+    height: 160px;
+  }
+
+  .LanguageDetection-chart-track {
+    fill: var(--control-bg, @control-bg);
+  }
+
+  .LanguageDetection-chart-bar {
+    fill: var(--primary-color, @primary-color);
+  }
+
+  .LanguageDetection-chart-column:hover .LanguageDetection-chart-track {
+    fill: fade(#000, 8%);
+  }
+
+  .LanguageDetection-chart-axis {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    color: var(--muted-color, @muted-color);
+    font-size: 11px;
+  }
+
+  // Empty and failed states
+  // ----------------------------------------------------------------------------------------------
+
+  .LanguageDetection-empty {
+    padding: 48px 24px;
+    color: var(--muted-color, @muted-color);
+    text-align: center;
+
+    .icon {
+      font-size: 48px;
+      opacity: 0.4;
+    }
+
+    p {
+      margin: 16px 0 0;
+    }
+  }
+
+  // Settings
+  // ----------------------------------------------------------------------------------------------
+
+  .LanguageDetection-settings {
+    max-width: 600px;
+
+    .helpText {
+      margin-top: -8px;
+    }
+  }
+
+  @media (max-width: 767px) {
+    padding: 12px 0;
+
+    .LanguageDetection-content {
+      padding: 16px;
+    }
+
+    // One field per line. The header labelled columns that no longer exist, so it goes.
+    .CardList-header {
+      display: none;
+    }
+
+    .CardList-row {
+      grid-template-columns: 1fr;
+      gap: 4px;
+      padding: 12px;
+    }
+
+    .CardList-number {
+      text-align: left;
+    }
+  }
+}

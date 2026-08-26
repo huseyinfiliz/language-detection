@@ -1,5 +1,66 @@
 huseyinfiliz-language-detection:
   admin:
+    dashboard:
+      tab_overview: Genel bakış
+      tab_languages: Diller
+      tab_missing: Eksik
+      tab_countries: Ülkeler
+      tab_settings: Ayarlar
+
+      window_7: 7 gün
+      window_30: 30 gün
+      window_90: 90 gün
+
+      load_failed: İstatistikler yüklenemedi.
+      analytics_disabled: Dil istatistikleri kapalı olduğu için yeni kayıt tutulmuyor. Aşağıdakiler, kapatılmadan önce toplananlardır.
+
+      card_requests_label: Sayfa görüntüleme
+      card_requests_help: Bu dönemde sayılan tüm sayfa görüntülemeleri.
+      card_visitors_label: Günlük ziyaretçi
+      card_visitors_help: Bir ziyaretçi her gün için bir kez sayılır; üç ayrı gün gelen biri üç kez sayılır. Bu, kişi sayısı değildir.
+      card_languages_label: İstenen dil
+      card_languages_help: Ziyaretçilerin kaç farklı dil talep ettiği. Hiçbir dil belirtmeyen görüntülemeler burada sayılmaz.
+      card_countries_label: Ülke
+      card_countries_help: Ziyaretçilerin kaç ülkeye yerleştirildiği. Konumu belirlenemeyen adresler burada sayılmaz.
+      card_served_label: Karşılanan
+      card_served_help: Bu forumda kurulu olan bir dili talep eden sayfa görüntülemeleri.
+      card_unserved_label: Karşılanmayan
+      card_unserved_help: Bu forumda bulunmayan bir dili talep eden sayfa görüntülemeleri. Eksik sekmesi bunlarla ilgilidir.
+      card_unstated_label: Tercih yok
+      card_unstated_help: Tarayıcısı kullanılabilir bir dil belirtmeyen sayfa görüntülemeleri. Bunlar ne karşılandı ne de karşılanamadı. Karşılanan, karşılanmayan ve tercih yok toplamı, sayfa görüntüleme toplamına eşittir.
+
+      languages_title: Ziyaretçilerin talep ettiği diller
+      languages_column_language: Dil
+      languages_column_requests: Sayfa görüntüleme
+      languages_column_visitors: Günlük ziyaretçi
+      languages_column_status: Durum
+      languages_served: Karşılandı
+      languages_unserved: Karşılanmadı
+      languages_no_preference: Dil belirtilmedi
+      languages_unnamed: Tanınmayan dil etiketi
+      languages_empty: Bu dönem için henüz kayıt yok.
+
+      countries_title: Ziyaretçilerin geldiği yerler
+      countries_column_country: Ülke
+      countries_column_requests: Sayfa görüntüleme
+      countries_column_visitors: Günlük ziyaretçi
+      countries_unknown: Konumu belirlenemedi
+      countries_empty: Bu dönem için henüz kayıt yok.
+
+      missing_title: Bu forumun gösteremediği diller
+      missing_description: Ziyaretçilerin talep ettiği ancak dil paketi kurulu olmayan diller, en çok talep edilenden başlayarak. Aynı dilin farklı yazımları tek satırda birleştirilir.
+      missing_column_language: Dil
+      missing_column_requests: Sayfa görüntüleme
+      missing_column_visitors: Günlük ziyaretçi
+      missing_column_package: Dil paketi
+      missing_no_package: Tek bir dil paketi yok
+      missing_variants: "Şu biçimlerde talep edildi: {tags}"
+      missing_empty: Ziyaretçilerin talep ettiği tüm diller kurulu.
+
+      trend_title: Günlük sayfa görüntüleme
+      trend_empty: Bu dönemde hiç sayfa görüntüleme kaydedilmedi.
+      trend_tooltip: "{date}: {requests} sayfa görüntüleme, {visitors} günlük ziyaretçi"
+
     settings:
       detection_order_label: Algılama sırası
       detection_order_help: Bir ziyaretçinin dili belirlenirken hangi sinyalin önce denendiği.
