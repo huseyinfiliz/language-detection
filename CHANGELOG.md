@@ -31,3 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a date-only cookie that expires at midnight; nothing identifying is stored server-side.
   Bots are excluded by default (`ignore_bots` setting); analytics can be switched off
   entirely (`enable_analytics` setting).
+- Missing-languages report: reads the collected statistics back and lists the languages
+  visitors asked for that the forum could not serve, each with the Composer package that
+  would fix it. A language the forum can already serve is never listed, however the visitor
+  spelled their request, and requests for one language are rolled up into a single row --
+  so `de`, `de-DE` and `de-AT` add up to one suggestion rather than three small ones.
+  Languages Flarum publishes no single pack for are still reported, without a package,
+  rather than being quietly dropped.
