@@ -4,8 +4,6 @@ import Button from 'flarum/common/components/Button';
 import extractText from 'flarum/common/utils/extractText';
 import type AdminPage from 'flarum/admin/components/AdminPage';
 import type { ComponentAttrs } from 'flarum/common/Component';
-import type Mithril from 'mithril';
-import m from 'mithril';
 
 import { count, trans } from '../format';
 import type { CleanupResult, IpDataset } from '../types';

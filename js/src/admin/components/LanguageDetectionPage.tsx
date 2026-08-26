@@ -4,8 +4,6 @@ import Button from 'flarum/common/components/Button';
 import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
 import icon from 'flarum/common/helpers/icon';
 import type { ExtensionPageAttrs } from 'flarum/admin/components/ExtensionPage';
-import type Mithril from 'mithril';
-import m from 'mithril';
 
 import CountriesTable from './CountriesTable';
 import LanguagesTable from './LanguagesTable';

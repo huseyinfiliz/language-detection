@@ -1,7 +1,6 @@
 import Component from 'flarum/common/Component';
 import icon from 'flarum/common/helpers/icon';
 import type { ComponentAttrs } from 'flarum/common/Component';
-import type Mithril from 'mithril';
 
 import { count, countryName, trans } from '../format';
 import type { CountryRow } from '../types';

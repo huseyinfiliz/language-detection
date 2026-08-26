@@ -1,6 +1,5 @@
 import Component from 'flarum/common/Component';
 import type { ComponentAttrs } from 'flarum/common/Component';
-import type Mithril from 'mithril';
 
 import { count, percentage, trans } from '../format';
 import type { Summary } from '../types';
