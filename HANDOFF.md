@@ -1,13 +1,15 @@
 # Handoff — `huseyinfiliz/language-detection` (Flarum 1.x)
 
-> **Status: Phases 1–6 are complete. Phase 7 (missing languages) is next — its full work order is §18;
-> start there.** §6 carries the data model, §17 is now the specification of the counting that fills it, and
-> §14 is the specification of the matcher Phase 7 diffs against.
+> **Status: Phases 1–7 are complete. Phase 8 (admin UI and API) is next — its full work order is §19;
+> start there.** §6 carries the data model, §17 is now the specification of the counting that fills it, §18 is
+> the specification of the missing-languages report Phase 8 puts on a page, and §14 is the specification of the
+> matcher both of those defer to.
 > This file exists so a fresh session can resume without re-doing discovery.
 > It is a working document — remove it (or gitignore it) before release.
 >
-> **Repository state, 2026-08-25:** branch `1.x`, pushed to `origin/1.x` through Phase 4 (`cb43798`);
-> Phase 5 (`b5a7567`) and Phase 6 (`875e7eb`) are committed locally and still need pushing.
+> **Repository state, 2026-08-26:** branch `1.x`, pushed to `origin/1.x` through Phase 4 (`cb43798`);
+> Phase 5 (`b5a7567`), Phase 6 (`875e7eb`) and Phase 7 (`e56150e`) are committed locally and still need
+> pushing.
 > Phase 5 adds `src/IpCountryLookup.php`, `src/CountryLanguage.php`, `scripts/build-ip-data.php`, the
 > generated `resources/ip4.dat` / `ip6.dat` / `ip-data.php`, two new unit test files and the `.dat` fixtures —
 > **2.2 MB of committed binary data**, which is the first push where that matters. It is also the first phase
@@ -16,6 +18,8 @@
 > `Middleware/DetectLanguage.php`. It is the first phase whose core behaviour is *database* behaviour, so it is
 > also the first where CI's MySQL run — not local reading — is the only thing that can confirm the feature
 > works at all.
+> Phase 7 adds `src/LanguageCatalog.php` and two test files, and touches nothing that already existed except
+> `CHANGELOG.md`. It is read-only: `SELECT` and nothing else, no settings, no registration in `extend.php`.
 >
 > **Commit convention (standing instruction from the project owner):** author **and** committer are
 > `Hüseyin Filiz <mysuperuser01@gmail.com>`; never add a `Co-Authored-By: Claude … <noreply@anthropic.com>`
@@ -887,13 +891,102 @@ by cookie name, so adding the day cookie to a response already carrying the loca
 Structural checks as in every earlier phase: UTF-8 without BOM, LF endings, no tabs, no trailing whitespace,
 final newline, balanced braces/parens/brackets, `! ` spacing per `.styleci.yml`, alphabetical imports.
 
-**Phase 7 — Missing languages. ← NEXT. Full work order in §18.** `LanguageCatalog` diffing requested locales
-against `LocaleManager::getLocales()`, sorted by request volume, with a "View language package" link.
-`locale = ''` must be excluded from that report explicitly (§17).
+**Phase 7 — Missing languages. ✅ DONE.** Work order in §18, followed with three deviations (decisions 1, 2
+and 3 below). Built: `src/LanguageCatalog.php`, `tests/unit/LanguageCatalogTest.php` (20 tests),
+`tests/integration/MissingLanguagesTest.php` (12 tests), plus a `CHANGELOG.md` line. Neither file uses a data
+provider, so those are case counts as well as method counts. **Nothing that already existed was touched** —
+`extend.php` unchanged, no migration, no settings, no locale keys, and `SELECT` only.
 
-**Phase 8 — Admin dashboard.** `ExtensionPage` subclass in the `fof/badges` idiom; the three API endpoints;
-summary cards; languages / missing / countries tables; 7·30·90-day inline-SVG trend; settings tab. Complete
-`locale/*.yml`.
+Decisions taken during Phase 7:
+
+1. **Deviation — `LocaleManager` dropped from the constructor.** §18 sketched
+   `__construct(LocaleMatcher, LocaleManager, ConnectionInterface, ?string $path = null)`; the class ships with
+   three arguments and no locale manager. It would have been dead weight: the only question this phase asks of
+   the installed set is *"is this tag served?"*, and that is `LocaleMatcher::match()` in its entirety — the
+   matcher already holds the manager. Marking *which catalog entries are installed* is a different feature and
+   belongs to Phase 8's languages table, which will need the manager itself. Autowiring is unaffected (decision
+   4).
+2. **Deviation — a public `keyFor()` beyond §18's `entryFor()`.** §18 specified only "entry for a code".
+   `missingFrom()` needs the catalog *key* as the group identifier, not the entry: two tags belong in one row
+   when they resolve to the same pack, and comparing entry arrays to decide that would be both slower and
+   ambiguous (nothing stops two catalog rows from sharing a name). `entryFor()` is now a thin wrapper over
+   `keyFor()`, and the key doubles as the `locale` a row reports.
+3. **Deviation — `missingFrom()` takes an associative map.** §18 sketched `array<string, int[]>`. Shipped as
+   `array<string, array{requests: int, visitors: int}>`, because the positional form makes `$volume[0]` /
+   `$volume[1]` the reader's problem at every use site, and getting them the wrong way round is a silent bug
+   that swaps two plausible-looking numbers in an admin's table.
+4. **`extend.php` needed no change, as §18 predicted — and the integration test proves it rather than
+   assuming it.** Every `MissingLanguagesTest` case resolves the class with `$container->make()`, so if the
+   nullable `?string $path` ever stopped autowiring, twelve tests fail with a clear reason. (Laravel's
+   `resolvePrimitive()` fills an unresolvable primitive from its default; that is the mechanism `CountryLanguage`
+   already relies on.)
+5. **Each row carries the `tags` it was built from.** Not in §18. The roll-up is the report's most opinionated
+   step — `de`, `de-DE` and `de-AT` become one row — and a number an admin cannot decompose is a number they
+   have to take on trust. Sorted, so the integration assertion is not at the mercy of MySQL's row order.
+6. **A row's `locale` is the catalog key when one was found and the requested tag when not.** Which means the
+   column is *usually* installable-as-spelled (`pt-BR`, `es_AR`, `zh-Hans` — exactly the string an admin types)
+   but not always. Phase 8 must not treat it as a package coordinate; the `package` field is the only thing
+   that is one, and it is nullable.
+7. **`keyFor()` has no unambiguous-sibling tier, deliberately.** `LocaleMatcher` has one and it is right there,
+   because a forum's installed set is small and a lone `nb` really is the only thing that could answer `no`. The
+   catalog is the opposite: every variant Flarum publishes is in it, so `sr` would choose between `sr-Cyrl` and
+   `sr-Latn` and `zh` between `zh-Hans` and `zh-Hant`, *every time*, forever. Picking one would be a guess
+   presented to an admin as a recommendation. Null therefore means two things — no pack exists (`sw`, `zu`) or
+   several could (`no`, `ku`, `sr`, `zh`) — and both are reported with the package column blank rather than
+   dropped, because suppressing demand nobody can act on yet would make every total on the page smaller than
+   the truth. **Phase 8 owes both cases a display string** (decision 11).
+8. **The `zh-cn` gap is pinned, not patched.** `zh-cn` resolves to no pack: region→script needs a table this
+   extension does not carry. Fixing it *here alone* would be worse than the gap — `LocaleMatcher` declines
+   `zh-CN` at detection time too (its own test asserts `['zh-CN'] → null` even with `zh-Hans` installed), so an
+   admin would install the pack this report named and those visitors would **still** not be served Chinese. The
+   fix belongs in the matcher, is out of Phase 7's scope, and is raised as an open question in §19.
+   `test_a_region_that_implies_a_script_is_not_guessed` locks the current behaviour in so that it reads as a
+   decision rather than an oversight.
+9. **The window is `subDays($days - 1)`, clamped with `max(1, …)`.** So `missing(7)` covers seven calendar days
+   *including today*, which is what makes it agree with the seven-bar chart Phase 8 draws beside it. The clamp
+   stops a zero or a negative from asking for a cutoff in the future and reporting nothing at all — which would
+   look like good news. Pinned from both sides in integration, since it is a query behaviour.
+10. **`fold()` repeats `LocaleMatcher::normalize()`'s three lines rather than reaching for them.** Same choice
+    `Analytics` made, same reason plus one: `normalize()` is `protected` and no part of that class's contract,
+    and what is folded here is a requested tag against a **published catalog**, not against a forum's installed
+    locales. Coupling them would mean a future change to *matching* silently re-points every package link on the
+    admin page. `CODE_ALIASES` is read from the constant rather than copied, so the alias list itself stays in
+    one place.
+11. **Three errors in §18 were found and fixed before it shipped as a specification.** Worth recording because
+    the corrected text is what the code follows: (a) §18 had `CODE_ALIASES` applied in the wrong **direction** —
+    the map is `['uzb' => 'uz']`, catalog key → ISO code, so applying it to a requested `uz` finds nothing; the
+    fix is to fold *both* sides while building the index, which files catalog `uzb` under `uz` and makes plain
+    exact-matching resolve it, with no separate alias step. (b) §18's truncation example implied `zh` was a
+    catalog fallback; **`zh` is not a catalog key at all**, which turns the example into a stronger argument —
+    strip straight to the base language and Chinese resolves to *nothing*. (c) The test list still described a
+    "normalised index" and a separate alias step. All three are corrected in §18 as it now stands.
+12. **The unit tests run against the real `resources/languages.php`.** A fixture would have proved nothing about
+    the file that ships: the irregular keys (`es_AR`, `uzb`, `zh-Hans`, `pt-BR`) *are* the difficulty, and
+    inventing tidy ones would test the easy case only. `LocaleManager` and `LocaleMatcher` are real for the same
+    reason they are real in `LocaleMatcherTest` — doubling them turns every assertion into a claim about which
+    methods got called. The connection, by contrast, is an expectation-free Mockery double, which makes "this
+    half of the class never queries" an assertion rather than a convention.
+
+**Verification actually performed:** the PHP was **not executed** — there is still no PHP, composer, node or npm
+in this environment, so `src/LanguageCatalog.php` and both test files are **unverified until CI runs**. Stated
+plainly: **the aggregate query is unexercised until `tests/integration/MissingLanguagesTest.php` runs against a
+real MySQL**, because the unit suite deliberately never issues it. That `SUM()`/`GROUP BY` over the seeded rows
+returns what these tests claim, and that `SUM()` arrives as a *string* needing the `(int)` casts, are facts about
+PDO and MySQL that no local reading confirms.
+
+What was done instead: `Illuminate\Database\ConnectionInterface::table($table, $as = null)` re-read at the locked
+version, and `selectRaw()` (`Query/Builder.php:287`) and `groupBy()` (line 1888) confirmed present on the builder
+`table()` returns. Confirmed that `isset(SomeClass::CONST_ARRAY[$key])` is legal — `src/LocaleMatcher.php:213`
+already does it and shipped through CI in Phase 3. All **87** catalog entries were checked by hand to match
+`['name' => …, 'native' => …, 'package' => null|'flarum-lang/…']` in that exact key order, with no empty name or
+native, which is precisely what `test_the_shipped_catalog_is_shaped_the_way_the_report_expects` asserts — so that
+test should pass, and if it does not, the catalog changed. Structural checks as in every earlier phase: UTF-8
+without BOM, LF endings, no tabs, no trailing whitespace, final newline, balanced braces/parens/brackets, `! `
+spacing per `.styleci.yml`, alphabetical imports, every import used, longest line 107 columns.
+
+**Phase 8 — Admin dashboard. ← NEXT. Full work order in §19.** `ExtensionPage` subclass in the `fof/badges`
+idiom; the three API endpoints; summary cards; languages / missing / countries tables; 7·30·90-day inline-SVG
+trend; settings tab. Complete `locale/*.yml`.
 
 **Phase 9 — Cleanup.** `language-detection:cleanup` console command, `Extend\Console` scheduling, and the
 manual "Delete old statistics" admin action.
@@ -930,6 +1023,19 @@ tests, README (privacy section is mandatory), CHANGELOG. **Do not begin the Flar
 9. **The dataset path has no end-to-end coverage.** Integration tests cannot set `REMOTE_ADDR` (§12 Phase 5
    decision 9), so "a real address resolves to a country through the middleware" is asserted only at the unit
    level. The edge-header path is covered end to end.
+10. **`js/dist/admin.js` is a tracked 635-byte stub and cannot be rebuilt here.** *Verified:* `git ls-files
+    js/dist` returns `admin.js` and `admin.js.map`, `.gitignore` does not cover them, and there is no
+    node/npm/yarn in this environment. `.github/workflows/frontend.yml` runs the reusable frontend workflow with
+    `enable_prettier: true` and `enable_typescript: true` — so CI **type-checks and format-checks** the source,
+    and does **not** build a bundle or commit one back. The consequence for Phase 8 is concrete and is a release
+    blocker rather than an inconvenience: once the TSX lands, CI can go green while the extension still ships
+    the stub, so **the admin page will not appear in any browser until someone runs `yarn build` in `js/` and
+    commits the result**. Two things follow. Phase 8 must say so in its own report rather than describing the
+    page as done, and Phase 10 must check the committed bundle's size before release — 635 bytes means it was
+    never rebuilt. The format gate is also strict: `@flarum/prettier-config@1.0.0` is
+    `{"printWidth": 150, "singleQuote": true, "tabWidth": 2, "trailingComma": "es5"}` (*verified* — fetched from
+    the resolved tarball in `js/yarn.lock`), and hand-written TSX that no `prettier --write` ever touched will
+    very likely fail `format-check` on whitespace nobody can see.
 
 ---
 
@@ -1717,7 +1823,7 @@ the status header above. Close Phase 6 out the way every phase closes: record wh
 
 ---
 
-## 18. Phase 7 work order — missing languages (**← START HERE**)
+## 18. Phase 7 work order — ✅ implemented, kept as the missing-languages specification
 
 > Self-contained on purpose: a fresh session should be able to build Phase 7 from this section plus the
 > cross-references below, without re-doing discovery. API claims marked *verified* were read out of `vendor/`
@@ -1959,3 +2065,290 @@ the status header above. Close Phase 7 out the way every phase closes: record wh
 §12, and write the Phase 8 work order as §19 — and make sure that work order carries the two boundaries this
 one depends on, namely that `Api/MissingLanguagesController` calls `LanguageCatalog::missing()` instead of
 re-querying, and that the display strings for null names and null packages are Phase 8's to add.
+
+---
+
+## 19. Phase 8 work order — admin dashboard and API (**← START HERE**)
+
+> Self-contained on purpose: a fresh session should be able to build Phase 8 from this section plus the
+> cross-references below, without re-doing discovery. API claims marked *verified* were read out of `vendor/`
+> and out of this repository on 2026-08-26 at the locked versions (`flarum/core` 1.8.19,
+> `illuminate/database` v8.83.27), except the one marked as fetched from the network.
+
+**Read first, in this order:** §9's "Admin UI idiom to mirror" (the LESS vocabulary, and the instruction that
+the trend chart is inline SVG with **no chart library**), §9's admin-API notes (the `RequestHandlerInterface` →
+`assertAdmin()` → `JsonResponse` idiom, and the custom-payload idiom), §8 (why there is no permission and why
+the controllers are named `…Controller`), §6 (the table, and why `country_code` is `''` rather than null), §18
+(the missing-languages report, which Phase 8 renders and **must not re-query**), and §13 risk 10 (why this
+phase cannot finish in this environment — read it before promising anyone a working page).
+
+**Goal:** put everything the previous five phases collected in front of an admin, on one page, in the
+`fof/badges` idiom — summary cards, a languages table, the missing-languages table, a countries table, a
+7/30/90-day trend, and the five settings — and expose the two JSON endpoints that feed it.
+
+### Scope discipline — what Phase 8 must NOT touch
+
+- **No cleanup, no retention, no deletes.** Phase 9 owns the `language-detection:cleanup` command, its
+  `Extend\Console` scheduling, and the manual "Delete old statistics" admin action with its
+  `Api/CleanupController`. Phase 8 renders the `retention_days` *setting* (it is already declared in
+  `extend.php`) and issues **no** `DELETE` of any kind. Note that §11 and §12's old Phase 8 stub said "the three
+  API endpoints", counting `CleanupController` — **Phase 8 ships two endpoints**, and the third arrives with the
+  command that shares its logic.
+- **Do not re-query the missing-languages report.** `Api/MissingLanguagesController` calls
+  `LanguageCatalog::missing($days)` and serialises what it returns. Re-deriving that aggregate in
+  `src/Statistics.php` would fork the one non-obvious decision Phase 7 exists to make — filter by
+  `LocaleMatcher::match()` *before* grouping by pack (§18, and the class docblock) — and the two copies would
+  drift on the first bug fix.
+- **Do not change any detection or counting class.** `BrowserLanguageParser`, `LocaleMatcher`, `CountryLanguage`,
+  `IpCountryLookup`, `LanguageDetector`, `Analytics`, `BotDetector`, `Middleware/DetectLanguage` and
+  `LanguageCatalog` are all specified by §14–§18 and all done. Phase 8 reads. In particular **do not add
+  anything to the request path**: the admin page must cost a forum visitor nothing.
+- **No migration.** Every figure on the page comes out of the existing three indexes. If a query seems to need a
+  new column, it is the query that is wrong — see §6's "fallback requests need no extra column".
+- **Do not touch `resources/languages.php`, `resources/countries.php` or the `.dat` files.**
+- **Do not start Phase 10's review, and do not begin the Flarum 2.x upgrade.**
+
+### Deliverables
+
+```
+src/Statistics.php
+src/Api/StatisticsController.php
+src/Api/MissingLanguagesController.php
+extend.php                                    (routes + admin payload; first change since Phase 4)
+locale/en.yml  locale/tr.yml                  (dashboard keys; settings/ip_data/cleanup keys exist already)
+less/admin.less                               (currently 0 bytes)
+js/src/admin/index.ts                         (currently a TODO stub)
+js/src/admin/components/LanguageDetectionPage.tsx
+js/src/admin/components/StatsCards.tsx
+js/src/admin/components/LanguagesTable.tsx
+js/src/admin/components/MissingLanguages.tsx
+js/src/admin/components/CountriesTable.tsx
+js/src/admin/components/TrendChart.tsx
+js/src/admin/components/SettingsTab.tsx
+tests/integration/ApiTest.php
+tests/unit/StatisticsQueryTest.php
+CHANGELOG.md
+```
+
+**Commit this phase in two commits, backend then frontend.** Not tidiness: the backend half is gated by CI's
+MySQL run and the frontend half is gated by nothing that can prove it works (§13 risk 10). One commit would let
+a single green tick stand for both.
+
+**On that unit test's name.** `tests/integration/StatisticsTest.php` already exists (Phase 6's counting tests).
+A second file named `StatisticsTest.php` under `tests/unit/` would work — the suites are separate and neither
+directory is autoloadable (§12 Phase 6 decision 7) — but it is confusing to grep and to talk about, hence
+`StatisticsQueryTest.php` above.
+
+### `src/Statistics.php`
+
+Constructor: `__construct(ConnectionInterface $db, LanguageCatalog $catalog, LocaleMatcher $matcher)`. No
+`LocaleManager` — "can the forum serve this?" is `LocaleMatcher::match()` and nothing else, which is Phase 7
+decision 1 and holds here for the same reason. Autowires with no registration.
+
+Four methods, one aggregate each, all windowed by `$days` the same way `LanguageCatalog::missing()` is —
+`Carbon::now()->subDays(max(1, $days) - 1)->toDateString()`, so seven days is today and the six before it.
+**Copy that expression exactly**; a dashboard whose "last 7 days" card disagrees with its own seven-bar chart is
+worse than no card at all.
+
+- `summary(int $days): array` → `['requests', 'visitors', 'languages', 'countries', 'served', 'unserved']`.
+  `languages` counts **distinct non-empty** locales and `countries` distinct **non-empty** country codes —
+  `COUNT(DISTINCT locale)` counts `''` as a value, so without the guard every forum reports one language more
+  than it has. `served`/`unserved` are request sums split by `LocaleMatcher::match()`, which is §6's fallback
+  signal computed at query time; do that split in PHP over the grouped rows, not in SQL.
+- `languages(int $days): array` → one row per requested locale: `['locale', 'name', 'native', 'served',
+  'requests', 'visitors']`, ordered by requests desc then by locale (same tie-break reasoning as §18 — MySQL's
+  order for equal sums is unspecified). `name`/`native` come from `LanguageCatalog::entryFor()` and are null for
+  a tag no pack answers. `locale === ''` **stays** in this table as the "no preference stated" row: it is real
+  traffic and often the largest bucket, and it is the missing-languages report, not this one, that has to
+  exclude it. Give it its own translated label; do not render an empty cell.
+- `countries(int $days): array` → `['country', 'requests', 'visitors']`, same ordering rule. `''` is "Unknown"
+  (§6) and is a row like any other.
+- `trend(int $days): array` → one entry per **calendar day in the window**: `['date', 'requests', 'visitors']`,
+  oldest first. `GROUP BY date` returns only the days that have rows, so **zero-fill the gaps in PHP** or the
+  chart silently compresses quiet days and draws the wrong shape.
+
+Cast every `SUM()` and `COUNT()` to `int` — they arrive from PDO as strings (§12 Phase 7, and
+`MissingLanguagesTest::test_the_totals_are_integers_and_not_the_strings_the_driver_returns` for why it matters).
+
+**`SUM(unique_visitors)` is not a count of people, and the UI must not claim it is.** The column is incremented
+once per visitor per day (§6), so a reader who visits on three days contributes three. Over a 30-day window the
+figure is "daily visitors, summed" — a real and useful number, and not the same thing as 30-day uniques. Keep
+the API field named `visitors`, for consistency with Phase 7's report, and put the honesty in the locale string:
+label the card something like "Daily visitors" with help text saying a visitor is counted once per day. Do not
+invent a second field name for the same column.
+
+### The two endpoints
+
+`Extend\Routes('api')` (*verified* — `vendor/flarum/core/src/Extend/Routes.php`, whose docblock states that a
+handler "should implement \Psr\Http\Server\RequestHandlerInterface"):
+
+```php
+(new Extend\Routes('api'))
+    ->get('/language-detection/statistics', 'huseyinfiliz-language-detection.statistics',
+        Api\StatisticsController::class)
+    ->get('/language-detection/missing', 'huseyinfiliz-language-detection.missing',
+        Api\MissingLanguagesController::class),
+```
+
+Each controller: `RequestUtil::getActor($request)` → `$actor->assertAdmin()` → `new JsonResponse([...])`. All
+three verified present at the locked version — `Flarum\Http\RequestUtil::getActor(): User`,
+`User::assertAdmin()` (`src/User/User.php:659`), and `Laminas\Diactoros\Response\JsonResponse`. There is **no
+permission to check** and none to declare: §8 settled that, because Flarum 1.x's admin frontend has no
+non-admin subject to gate.
+
+**`days` is a whitelist, not an integer.** Read `$request->getQueryParams()['days'] ?? null` and accept only
+`7`, `30` and `90`; anything else — absent, non-numeric, `0`, negative, `10000` — becomes `30`. The UI offers
+exactly those three, so anything else is either a typo or someone poking at the endpoint, and a whitelist makes
+that a non-question instead of a clamping puzzle. Do **not** pass `null` through to
+`LanguageCatalog::missing(null)` from the web: all-time is a real code path with real tests, and nothing in the
+UI asks for it.
+
+Payload shapes — flat, with field names identical to what `Statistics` and `LanguageCatalog` return, so there is
+no translation layer to get wrong:
+
+```
+GET /api/language-detection/statistics?days=30
+{ "days": 30, "summary": {…}, "languages": [...], "countries": [...], "trend": [...] }
+
+GET /api/language-detection/missing?days=30
+{ "days": 30, "missing": [ { locale, name, native, package, requests, visitors, tags } ] }
+```
+
+**No row caps, and say why in a comment.** Every dimension here is naturally bounded — countries by 250,
+distinct locales by what browsers actually send — and a silent top-N would make an admin's totals disagree with
+their own table. If a cap ever becomes necessary it has to be visible in the payload.
+
+`extend.php` also gains the IP-dataset payload, so `admin.ip_data.notice` has a date to interpolate (idiom
+*verified* in §9): `(new Extend\Frontend('admin'))->content(fn (Document $d) => $d->payload[…] = …)`, reading
+`resources/ip-data.php`. Handle the file being absent — `admin.ip_data.notice_unavailable` already exists for
+exactly that case.
+
+### The admin page
+
+Registration is one line in `js/src/admin/index.ts` (*verified* —
+`vendor/flarum/core/js/dist-typings/admin/utils/ExtensionData.d.ts`):
+
+```ts
+app.extensionData.for('huseyinfiliz-language-detection').registerPage(LanguageDetectionPage);
+```
+
+`LanguageDetectionPage extends ExtensionPage` (*verified* — `ExtensionPage<Attrs extends ExtensionPageAttrs>
+extends AdminPage<Attrs>`): override `content(vnode)`. `AdminPage` already supplies `settings`,
+`setting(key, fallback?)`, `buildSettingComponent(entry)`, `dirty()`, `isChanged()`, `saveSettings(e)` and
+`submitButton()`. Tabs are local component state, not routes — nothing needs a deep link, and a route would mean
+a resolver plus a second registration for no gain.
+
+Data loading: `app.request<T>({ method: 'GET', url: app.forum.attribute('apiUrl') + '/language-detection/…',
+params: { days } })`. `app.request` is typed `<ResponseType>(options: FlarumRequestOptions<ResponseType>):
+Promise<ResponseType>`, and `FlarumRequestOptions` extends Mithril's `RequestOptions`, so `method` and `params`
+type-check (*verified* — `common/Application.d.ts:20-34, 256`). Fire both endpoints together and render a
+`LoadingIndicator` until both settle; changing the window refetches both, so the cards and the tables are always
+from one instant.
+
+Settings tab: `buildSettingComponent()` handles all five. `detection_order` and `retention_days` are `'select'`,
+which **requires both an `options` map and a `default`** (*verified* — `SelectSettingComponentOptions` in
+`admin/components/AdminPage.d.ts`); `enable_analytics` and `ignore_bots` are `'bool'`; `default_locale` is a
+select whose options come from **`app.data.locales`**, a `Record<string, string>` of installed packs (*verified*
+— `ApplicationData.locales`, `common/Application.d.ts:99`, populated by `Frontend\Content\CorePayload`, which
+`flarum.frontend.factory` applies to *every* frontend including admin, so it is there without an extender). Its
+first option is `''` → `admin.settings.default_locale_forum_default`, which `locale/en.yml` already has.
+
+Two typing traps, worth knowing before `tsc` finds them in CI:
+
+- **Settings are strings.** `AdminPage`'s `SettingValue = string` and `AdminApplicationData.settings` is
+  `Record<string, string>` (*verified*). `enable_analytics` is `'1'`, and `'0'` is truthy in JS — compare against
+  `'1'` explicitly, never `if (setting())`.
+- **`app.data[…]` is `unknown`.** `ApplicationData` ends in `[key: string]: unknown`, so the IP-dataset payload
+  needs an explicit type assertion at the read site. Assert once, in one place, not at every use.
+
+### LESS and the trend chart
+
+`less/admin.less` is empty; fill it from §9's idiom — the `.card-style()` mixin, 24px page padding, 1400px max
+width, the pill tab bar with `.active`, `.Button-badge` count pills, the `repeat(auto-fit, minmax(150px, 1fr))`
+stat grid, `.CardList` grids driven by `--grid-cols` collapsing to a column at 768px, and the 48px 0.4-opacity
+empty state. **Every CSS custom property gets a LESS fallback** — house rule, not preference.
+
+The chart is hand-written inline SVG using Flarum's CSS variables. No library, no new palette (spec §36). It has
+to survive an all-zero window (a forum that just switched analytics on) without dividing by zero, and a
+single-point window without drawing a line from a point to itself.
+
+### Locale keys
+
+`locale/en.yml` already carries `admin.settings.*`, `admin.ip_data.*` and `admin.cleanup.*`. Phase 8 adds the
+dashboard: tab labels, the six summary cards with help text, column headers for all three tables, the "no
+preference stated" label for `locale === ''`, "Unknown" for `country_code === ''`, the trend's window buttons,
+an empty state per table, and a load-failure message.
+
+**Two strings Phase 7 owes you.** `missing[].name` and `missing[].package` are **both nullable**, and null means
+two different things (§18, Phase 7 decision 7): no pack exists at all (`sw`, `zu`), or several could and picking
+one would be a guess (`no`, `ku`, `sr`, `zh`). The report deliberately does not distinguish them, so one honest
+string has to cover both — something like "No single language pack" rather than "no package available", which
+reads as "Flarum does not translate this" and is wrong half the time. Where `package` is non-null, link to
+`https://packagist.org/packages/{package}` (the convention `README.md` already uses).
+
+`locale/tr.yml` mirrors every key with **matching ICU placeholders**. §12's Phase 2 record notes both files were
+verified key-for-key and placeholder-for-placeholder; Phase 8 roughly doubles them, so check it the same way.
+
+### Tests
+
+`tests/integration/ApiTest.php` is where Phase 8's real coverage lives, because it runs against MySQL in CI:
+
+- A guest gets 403, a non-admin gets 403, the admin gets 200. `authenticatedAs => 1` is the admin the setup
+  script creates, and `RetrievesAuthorizedUsers::normalUser()` is id 2 and **not** an admin (*verified* —
+  `vendor/flarum/testing/src/integration/RetrievesAuthorizedUsers.php:14-23`). Assert the 403s first: they are
+  the only security property this phase has, and a route registered without `assertAdmin()` would publish a
+  forum's traffic to anyone who guessed the URL.
+- Seeded rows in, expected JSON out, for both endpoints. Reuse `MissingLanguagesTest`'s `seed()` idiom —
+  `country_code` is part of the unique key, so every row needs one.
+- `days=7` excludes a row from day 10; `days=999` and `days=abc` both behave as `30`.
+- The trend has exactly `$days` entries, oldest first, with a seeded gap zero-filled.
+- `COUNT(DISTINCT locale)` does not count `''`: seed `''` plus two real locales, assert `languages === 2`.
+- An empty table returns a well-formed payload of zeros — not nulls, not an error.
+
+`tests/unit/StatisticsQueryTest.php` covers whatever pure shaping `Statistics` does — the zero-fill, the
+served/unserved split, the ordering and the tie-break. Split those out of the query methods the way Phase 7
+split `missingFrom()` out of `missing()`, and hand the connection an expectation-free
+`Mockery::mock(ConnectionInterface::class)` so that "this half issues no query" is an assertion rather than a
+convention (§12 Phase 6 decision 6).
+
+There is **no frontend test harness** in this repository — `js/package.json` has build, format and type-check
+scripts and nothing else (*verified*). The TSX is covered by `tsc` and `prettier` in CI and by nothing else.
+Write it accordingly: keep logic out of the components and in small exported functions, if you want any of it
+checkable at all.
+
+### Verification available in this environment
+
+Unchanged and still binding: **there is no PHP here** — no phpunit, no `php -l`, no composer. CI is the only
+gate. **Never state or imply that the tests pass.**
+
+Phase 8 adds a second, sharper limitation, and it must be reported rather than glossed: **there is no node, npm
+or yarn either.** For the frontend half nothing can be checked here — not types, not formatting, and above all
+not the bundle. Read §13 risk 10 in full before writing this phase's report. The short version:
+`js/dist/admin.js` is a tracked 635-byte stub, CI type-checks and format-checks the source but does **not** build
+or commit a bundle, and therefore **the admin page will not appear in any browser until someone runs `yarn build`
+in `js/` and commits the result.** A green CI on this phase means the TypeScript compiles and is formatted. It
+does not mean the page exists. Say that plainly, in those terms, and put the `yarn build` step in the commit
+message so it cannot be lost before release.
+
+What *can* be checked here, and should be: that every `app.translator.trans()` key the TSX names exists in
+**both** `locale/en.yml` and `locale/tr.yml` with matching placeholders (grep it — this is the one frontend claim
+that is checkable locally, and a typo'd key renders as the raw key in an admin's browser); that every route name,
+query-param name and payload field used in the TSX matches the PHP exactly; and the usual structural pass on the
+PHP — UTF-8 without BOM, LF endings, no tabs, no trailing whitespace, final newline, balanced
+braces/parens/brackets, `! ` spacing per `.styleci.yml`, alphabetical imports. For the TSX, match
+`@flarum/prettier-config@1.0.0` by hand: `{"printWidth": 150, "singleQuote": true, "tabWidth": 2,
+"trailingComma": "es5"}` (*verified by fetching the resolved tarball named in `js/yarn.lock`* — not from
+`vendor/`, since that package is not installed here).
+
+Finish by adding a `CHANGELOG.md` line under `## [Unreleased] / ### Added`, then commit per the convention in the
+status header above — backend and frontend as two commits, for the reason given above. Close Phase 8 out the way
+every phase closes: record what was built and decided in §12, and write the Phase 9 work order as §20. Carry
+these boundaries into it: the cleanup command and the manual admin action **share one implementation** (the
+command must not re-derive the retention cutoff that `Api/CleanupController` uses, or the other way round);
+`retention_days` is already declared in `extend.php` with a default of `'90'`, and `admin.cleanup.*` already has
+its four locale strings, including `retention_disabled` for the never-delete case; and `Extend\Console`'s
+`schedule(command, callback, args = [])` is the scheduling API (§9). Also raise, for a later phase to decide, the
+open question Phase 7 recorded and deliberately did not answer: **`zh-CN` and `zh-TW` resolve to nothing**, in
+`LocaleMatcher` at detection time as much as in `LanguageCatalog`, so Simplified- and Traditional-Chinese readers
+are neither served nor correctly reported. Fixing it means a region→script table and a change to §14's matcher,
+which is why Phase 7 pinned the behaviour in a test instead of guessing at it.
