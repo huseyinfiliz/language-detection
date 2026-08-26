@@ -93,6 +93,10 @@ huseyinfiliz-language-detection:
 
     cleanup:
       command_description: Delete language detection statistics older than the configured retention period.
+      button: Delete old statistics now
+      button_help: Deletes the rows older than the saved retention period. If you changed the period above, save it first. This cannot be undone.
+      confirm: Delete every statistics row older than the retention period? This cannot be undone.
       retention_disabled: Statistics are set to never be deleted, so nothing was removed.
       deleted: Deleted {count} statistics rows older than {days} days.
       nothing_to_delete: No statistics were old enough to delete.
+      failed: The old statistics could not be deleted.

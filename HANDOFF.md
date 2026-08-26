@@ -1,15 +1,15 @@
 # Handoff — `huseyinfiliz/language-detection` (Flarum 1.x)
 
-> **Status: Phases 1–7 are complete. Phase 8 (admin UI and API) is next — its full work order is §19;
-> start there.** §6 carries the data model, §17 is now the specification of the counting that fills it, §18 is
-> the specification of the missing-languages report Phase 8 puts on a page, and §14 is the specification of the
-> matcher both of those defer to.
+> **Status: Phases 1–8 are complete. Phase 9 (cleanup command and admin action) is next — its full work order
+> is §20; start there.** §6 carries the data model, §17 is now the specification of the counting that fills it,
+> §18 is the specification of the missing-languages report, §19 is the specification of the dashboard that
+> renders both, and §14 is the specification of the matcher all of those defer to.
 > This file exists so a fresh session can resume without re-doing discovery.
 > It is a working document — remove it (or gitignore it) before release.
 >
 > **Repository state, 2026-08-26:** branch `1.x`, pushed to `origin/1.x` through Phase 4 (`cb43798`);
-> Phase 5 (`b5a7567`), Phase 6 (`875e7eb`) and Phase 7 (`e56150e`) are committed locally and still need
-> pushing.
+> Phase 5 (`b5a7567`), Phase 6 (`875e7eb`), Phase 7 (`e56150e`) and Phase 8 (`52d800f` backend, `d033594`
+> frontend) are committed locally and still need pushing.
 > Phase 5 adds `src/IpCountryLookup.php`, `src/CountryLanguage.php`, `scripts/build-ip-data.php`, the
 > generated `resources/ip4.dat` / `ip6.dat` / `ip-data.php`, two new unit test files and the `.dat` fixtures —
 > **2.2 MB of committed binary data**, which is the first push where that matters. It is also the first phase
@@ -20,6 +20,12 @@
 > works at all.
 > Phase 7 adds `src/LanguageCatalog.php` and two test files, and touches nothing that already existed except
 > `CHANGELOG.md`. It is read-only: `SELECT` and nothing else, no settings, no registration in `extend.php`.
+> Phase 8 adds `src/Statistics.php`, three files under `src/Api/`, `src/Content/AdminPayload.php`, two test
+> files, ten modules under `js/src/admin/`, the whole of `less/admin.less` and 52 locale keys per language.
+> **It is the first phase whose deliverable cannot be verified by CI at all** (§13 risk 10): the tracked
+> `js/dist/admin.js` is still the scaffolding's bundle of an empty initializer, nothing in CI builds one, and
+> **the admin page will not appear in any browser until someone runs `yarn build` in `js/` and commits the
+> result.** Do that before release, or before showing the page to anybody.
 >
 > **Commit convention (standing instruction from the project owner):** author **and** committer are
 > `Hüseyin Filiz <mysuperuser01@gmail.com>`; never add a `Co-Authored-By: Claude … <noreply@anthropic.com>`
@@ -984,12 +990,142 @@ test should pass, and if it does not, the catalog changed. Structural checks as 
 without BOM, LF endings, no tabs, no trailing whitespace, final newline, balanced braces/parens/brackets, `! `
 spacing per `.styleci.yml`, alphabetical imports, every import used, longest line 107 columns.
 
-**Phase 8 — Admin dashboard. ← NEXT. Full work order in §19.** `ExtensionPage` subclass in the `fof/badges`
-idiom; the three API endpoints; summary cards; languages / missing / countries tables; 7·30·90-day inline-SVG
-trend; settings tab. Complete `locale/*.yml`.
+**Phase 8 — Admin dashboard. ✅ DONE.** Work order in §19, followed with the deviations below. Shipped as
+**two commits** as §19 required — `52d800f` backend, `d033594` frontend — because the backend half is gated by
+CI's MySQL run and the frontend half is gated by nothing that can prove it works.
+Built, backend: `src/Statistics.php`, `src/Api/AbstractController.php`, `src/Api/StatisticsController.php`,
+`src/Api/MissingLanguagesController.php`, `src/Content/AdminPayload.php`, the two `Extend\Routes('api')`
+registrations and the admin frontend's `->content()` in `extend.php`,
+`tests/unit/StatisticsQueryTest.php` (20 tests), `tests/integration/ApiTest.php` (14 tests).
+Built, frontend: ten modules under `js/src/admin/` — `index.ts`, `types.ts`, `format.ts`, and the components
+`LanguageDetectionPage`, `StatsCards`, `LanguagesTable`, `CountriesTable`, `MissingLanguages`, `TrendChart`,
+`SettingsTab` — plus the whole of `less/admin.less` (338 lines, previously empty) and 52 new `admin.dashboard.*`
+keys in each of `locale/en.yml` and `locale/tr.yml`.
 
-**Phase 9 — Cleanup.** `language-detection:cleanup` console command, `Extend\Console` scheduling, and the
-manual "Delete old statistics" admin action.
+Decisions taken during Phase 8:
+
+1. **Deviation — `Api\AbstractController` is a third backend file.** §19 sketched two controllers. Both need the
+   same three lines of `RequestUtil::getActor($request)->assertAdmin()` and the same `days` whitelist, and the
+   whitelist is the one place where a divergence would be invisible: two controllers that disagreed about what
+   `days=45` means would render a page whose cards and tables described different windows. `WINDOWS` and
+   `DEFAULT_WINDOW` are constants on it, and `js/src/admin/types.ts` mirrors them.
+2. **Deviation — the summary has seven fields, not six.** `unstated` joins `requests`, `visitors`, `languages`,
+   `countries`, `served` and `unserved`. §18 decision 7 left Phase 8 owing a display string for the requests
+   that stated no language at all; counting them as unserved would put most forums at "80% of visitors
+   unserved" and send an admin hunting a problem that does not exist. The three now add up to `requests`
+   exactly, with nothing to explain away, and the languages table carries the same distinction as a `served`
+   flag of true, false or **null**.
+3. **Deviation — `report()` assembles, it does not query four times.** It reads the clock **once**, fetches the
+   grouped languages and countries **once**, and derives the summary from those rows via `summaryFrom()`. Two
+   consequences, both deliberate: a card can never disagree with the table printed under it, and the
+   distinct-language count is a count of table rows rather than a `COUNT(DISTINCT locale)` — which SQL would
+   inflate by one on every forum with traffic, because it counts `''` as a value. A request that crossed
+   midnight between the first query and the last would otherwise have shipped a payload describing two
+   different weeks.
+4. **No row caps anywhere in the payload, deliberately.** Every dimension is naturally bounded (≈250 countries,
+   distinct locales by what browsers actually send), and a silent top-N would make an admin's totals disagree
+   with the table above them. Recorded in the class docblock: if a cap ever becomes necessary it has to arrive
+   as a **visible field in the payload**, not as a `limit()` nobody notices.
+5. **The IP payload has three states, and they say different things.** `null` (no dataset installed),
+   `{date: '…'}` (installed and dated), `{date: null}` (installed, but the sidecar carried no date). Only the
+   first means IP lookup is inactive; the third renders **nothing** rather than a notice, because a dataset
+   that is working but undated has nothing untrue to say about itself.
+6. **Integration-harness discovery, worth carrying forward:** `flarum/testing`'s `TestCase::request()` builds
+   `new ServerRequest([], [], $path, $method)`, and Diactoros takes `$queryParams` as its **8th** constructor
+   argument — so a query string written into the path (`/api/…/statistics?days=7`) **never reaches
+   `getQueryParams()`**. Every windowed test therefore chains `->withQueryParams(['days' => 7])`. A test that
+   relied on the path would have silently exercised the default window and passed for the wrong reason.
+7. **Deviation — the frontend has two modules that are not components.** `types.ts` mirrors the PHP array keys
+   verbatim (so the two halves of the payload cannot drift without something failing to compile) and
+   `format.ts` holds the translation prefix and the arithmetic. §19's instruction was to keep logic out of the
+   components "if you want any of it checkable at all"; with no frontend test harness in the repository, small
+   exported functions are the most that can be done.
+8. **Every translation key is a literal string** — including inside the `CARDS`, `TABS` and `WINDOW_LABELS`
+   tables, and including the served/not-served labels, which were first written as `'dashboard.languages_' +
+   state` and rewritten. Assembling a key from fragments defeats the *one* frontend claim that is checkable in
+   this environment, and a mistyped key renders as the raw key in an admin's browser with nothing in the
+   toolchain noticing.
+9. **The statistics fetch has its own `refreshing` flag**, not `AdminPage.loading`. `submitButton()` reads
+   `loading` for its spinner, so sharing it would have spun the save button every time somebody changed the
+   window.
+10. **Tabs are local component state, not routes.** Nothing on this page is worth a deep link, and a route
+    would mean a resolver plus a second registration for no gain.
+11. **`Intl.DisplayNames` is hand-declared.** `flarum-tsconfig` pins `lib` at es2019 and it was not typed until
+    es2021, so there is no declaration to import; it is genuinely absent in older browsers too, which is why
+    the constructor is read through a guarded cast, wrapped in try/catch, memoised as "instance or null", and
+    every caller falls back to the bare two-letter code. **Country flag emoji were dropped** for the same
+    class of reason: they render as two bare letters on Windows, which is what the admin is looking at.
+12. **The chart is hand-written SVG `<rect>`s** — no chart library and no new palette, fills taken from
+    Flarum's own CSS variables. Bars rather than a line, which also settles the one-day window a line chart
+    cannot draw. Nothing inside the SVG is text, because `preserveAspectRatio="none"` would distort glyphs:
+    the dates are HTML underneath and the per-day figures are `<title>` tooltips. `scale()` returns
+    `Math.max(1, …)` so that an all-zero window — every forum on its first day — draws its tracks instead of
+    dividing by zero.
+13. **Deviation — the table grids are driven by `--grid-tail`, not §19's `--grid-cols`.** It is the count of
+    columns *after* the name column (2 or 3), set by a `.CardList--cols-3` / `--cols-4` modifier class,
+    because `repeat(calc(var(--total) - 1), 1fr)` is not valid CSS — `repeat()` takes an integer. The modifier
+    class rather than an inline style, because **Mithril's inline style objects do not reliably set CSS custom
+    properties**. Naming it for the total would have been the misleading half of the choice.
+14. **The served/not-served pill colours are literals, and the LESS says why.** Every other colour on the page
+    is `var(--flarum-thing, @flarum-thing)` per the house rule, but reading a core variable of unknown value
+    and pairing it with a hand-picked text colour can produce an unreadable pair — a strong alert red behind
+    dark red text. The four literals assume a light admin area, which is what core 1.x ships; a dark admin
+    theme overrides two rules. Everything in `less/admin.less` is nested inside `.LanguageDetectionPage` so
+    that the deliberately generic class names (`.CardList`, `.Button-badge`) cannot reach anything else.
+15. **`missing_no_package` reads "No single language pack".** This is §18 decision 7's debt paid: the field is
+    null both when Flarum publishes no pack and when it publishes several and picking one would be a guess. The
+    report does not distinguish them, so the label must not either — "no package available" reads as "Flarum
+    does not translate this" and would be wrong about half the time.
+16. **The `''` language row keeps its own label and a blank status cell.** It is usually the largest row on the
+    page; hiding it would leave the page-view total on the cards unaccounted for, and colouring it red would
+    blame the extension for a visitor who asked for nothing. The countries table keeps its unplaceable row for
+    the mirror-image reason: a forum whose traffic is mostly unplaceable has a dataset or an edge-header
+    problem its admin should be able to see.
+17. **The visitors figure is labelled honestly rather than renamed.** `SUM(unique_visitors)` over a window is
+    daily visitors summed and is *not* a count of people; the card's help text says so in those words, in both
+    languages. Inventing a second name for the same number would only move the confusion somewhere less
+    visible.
+18. **`analytics_disabled` compares the setting to `'1'`.** Settings are strings and `'0'` is truthy in
+    JavaScript — the same trap §12 decision 4 recorded for Phase 2.
+
+**Verification actually performed:** nothing was executed. There is no PHP **and no node, npm or yarn** in this
+environment, so the two new test files are **unverified until CI runs** (the integration suite additionally needs
+MySQL), and the frontend was neither type-checked nor format-checked nor built. Stated plainly, because it is the
+whole of §13 risk 10: **CI cannot prove this phase works.** `js/dist/admin.js` is still the scaffolding's
+635-byte bundle of an *empty* initializer — inspected, it literally reads
+`initializers.add("huseyinfiliz-language-detection", function(){})` — `enable_bundlewatch` is `false` and there is
+no build step in either workflow, so a green tick on `d033594` means the TypeScript compiles and is formatted and
+means **nothing at all about whether the page appears**. Someone must run `yarn build` in `js/` and commit the
+result.
+
+What was checked by hand instead: all **72** translation keys the frontend references resolve in **both** locale
+files, and the placeholder sets are identical in both (the only ordering difference is `cleanup.deleted`'s
+`{count}`/`{days}`, which Turkish word order requires); every route path, query-parameter name and payload field
+in the TSX matches the PHP (`/language-detection/statistics`, `/language-detection/missing`, `days`, the seven
+summary fields, and the row shapes of `languagesFrom()`, `countriesFrom()`, `trendFrom()` and
+`LanguageCatalog::missing()`); every Flarum typing this code leans on was read at the locked version in
+`vendor/flarum/core/js/dist-typings` (`Translator.getLocale(): string | null`,
+`TranslatorParameters = Record<string, unknown>`, `ComponentAttrs extends Mithril.Attributes`,
+`ExtensionPageAttrs` exported, `content(): JSX.Element`, `CustomExtensionPage = new () => ExtensionPage<Attrs>`,
+`setting(key, fallback?): Stream<string>`, `buildSettingComponent`, `submitButton`, `request<T>` returning a real
+`Promise<T>`, and `params` reaching it through `Mithril.RequestOptions`); no line in `js/src` exceeds prettier's
+150 columns (longest is 145); and the usual structural pass on the PHP — UTF-8 without BOM, LF endings, no tabs,
+no trailing whitespace, final newline, balanced braces/parens/brackets, `! ` spacing per `.styleci.yml`,
+alphabetical imports.
+
+**Phase 9 — Cleanup. ✅ DONE.** `src/Cleanup.php` holds the retention policy; `Console\CleanupCommand`
+(`language-detection:cleanup`, scheduled daily through `Extend\Console`) and `Api\CleanupController`
+(`POST /api/language-detection/cleanup`, behind the same `assertAdmin()`) both call it and neither computes a
+cutoff of its own. The boundary is `Statistics::span()`'s, so a retention of *n* days cannot delete a row the
+*n*-day dashboard window still draws. `0`, an unsaved value, a non-numeric value and a negative all mean
+never-delete, because the unsafe reading of any of them is unrecoverable. Frontend: a delete button below the
+save button on the settings tab, reporting the three outcomes the endpoint distinguishes.
+`tests/integration/CleanupTest.php` (8 tests) pins the boundary, the four never-delete cases and both endpoint
+gates — **unverified until CI runs**, as ever.
+
+**Open question for a later phase:** `zh-CN` and `zh-TW` resolve to nothing, in `LocaleMatcher` at detection
+time as much as in `LanguageCatalog`, so Simplified- and Traditional-Chinese readers are neither served nor
+correctly reported. Fixing it needs a region→script table and a change to §14's matcher.
 
 **Phase 10 — Final review.** 1.x compatibility, security, performance, privacy, migrations, translations,
 tests, README (privacy section is mandatory), CHANGELOG. **Do not begin the Flarum 2.x upgrade.**
@@ -2068,7 +2204,7 @@ re-querying, and that the display strings for null names and null packages are P
 
 ---
 
-## 19. Phase 8 work order — admin dashboard and API (**← START HERE**)
+## 19. Phase 8 work order — ✅ implemented, kept as the dashboard specification
 
 > Self-contained on purpose: a fresh session should be able to build Phase 8 from this section plus the
 > cross-references below, without re-doing discovery. API claims marked *verified* were read out of `vendor/`

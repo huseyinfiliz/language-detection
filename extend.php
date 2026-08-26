@@ -13,6 +13,7 @@ namespace HuseyinFiliz\LanguageDetection;
 
 use Flarum\Extend;
 use Flarum\Http\Middleware\SetLocale;
+use Illuminate\Console\Scheduling\Event;
 
 return [
     (new Extend\Frontend('admin'))
@@ -40,7 +41,23 @@ return [
             '/language-detection/missing',
             'huseyinfiliz-language-detection.missing',
             Api\MissingLanguagesController::class
+        )
+        // The one endpoint that writes. It deletes by the saved `retention_days` setting and takes
+        // no period from the request, so there is nothing here a caller can widen.
+        ->post(
+            '/language-detection/cleanup',
+            'huseyinfiliz-language-detection.cleanup',
+            Api\CleanupController::class
         ),
+
+    // Daily, because the unit of the data is a day: running it more often could only ever delete
+    // rows the previous run already had. Forums without a configured scheduler still have the
+    // command by hand and the button on the admin page, which is why all three share `Cleanup`.
+    (new Extend\Console())
+        ->command(Console\CleanupCommand::class)
+        ->schedule(Console\CleanupCommand::class, function (Event $event) {
+            $event->daily();
+        }),
 
     (new Extend\Settings())
         ->default('huseyinfiliz-language-detection.detection_order', 'browser_ip')

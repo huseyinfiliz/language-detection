@@ -52,3 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   page is ever describing a different period from the one beside it. Countries are named
   in the administrator's own language where the browser can do it, and fall back to their
   two-letter code where it cannot.
+- Retention: a `language-detection:cleanup` console command, scheduled daily, and a "Delete old
+  statistics now" button on the admin page, both deleting daily rows older than the `retention_days`
+  setting. The command, the schedule and the button share one implementation, so the cutoff cannot
+  differ between them, and it is the same day boundary the dashboard's windows use -- a 90-day
+  retention never deletes a row the 90-day view would still show. `Never delete` and an unsaved or
+  unusable setting both delete nothing, and the endpoint takes no period from the request.

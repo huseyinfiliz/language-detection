@@ -313,6 +313,22 @@
     }
   }
 
+  // Separated from the fields above it because it is not one of them: it takes effect when pressed
+  // rather than when the form is saved, and it cannot be undone.
+  .LanguageDetection-cleanup {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--control-bg, @control-bg);
+
+    .helpText {
+      margin-top: 8px;
+    }
+  }
+
+  .LanguageDetection-cleanup-failed {
+    color: #b3261e;
+  }
+
   @media (max-width: 767px) {
     padding: 12px 0;
 

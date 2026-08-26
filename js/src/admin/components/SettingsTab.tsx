@@ -1,11 +1,14 @@
 import app from 'flarum/admin/app';
 import Component from 'flarum/common/Component';
+import Button from 'flarum/common/components/Button';
+import extractText from 'flarum/common/utils/extractText';
 import type AdminPage from 'flarum/admin/components/AdminPage';
 import type { ComponentAttrs } from 'flarum/common/Component';
 import type Mithril from 'mithril';
+import m from 'mithril';
 
-import { trans } from '../format';
-import type { IpDataset } from '../types';
+import { count, trans } from '../format';
+import type { CleanupResult, IpDataset } from '../types';
 
 /** Every setting key is prefixed with the extension id, as `Extend\Settings` declares them. */
 const SETTING = 'huseyinfiliz-language-detection.';
@@ -26,6 +29,12 @@ export interface SettingsTabAttrs extends ComponentAttrs {
  * stream `AdminPage.setting()` owns, which is what `submitButton()` submits and `isChanged()` counts.
  */
 export default class SettingsTab extends Component<SettingsTabAttrs> {
+  /** True while the cleanup request is in flight, so the button cannot be pressed twice. */
+  deleting = false;
+
+  /** The last cleanup's outcome, or false when it failed. Null before anything has been pressed. */
+  outcome: CleanupResult | false | null = null;
+
   view() {
     const page = this.attrs.page;
 
@@ -78,8 +87,74 @@ export default class SettingsTab extends Component<SettingsTabAttrs> {
           default: '90',
         })}
         <div className="Form-group">{page.submitButton()}</div>
+        {this.cleanup()}
       </div>
     );
+  }
+
+  /**
+   * Deleting the old rows now, rather than waiting for the scheduled command.
+   *
+   * Below the save button on purpose: it is not a setting, it takes effect immediately, and it
+   * cannot be undone. It also deletes by the *saved* retention period, not by whatever the select
+   * above is currently showing -- which is why the help text says so, and why an admin who changed
+   * the period has to save before this means what they think it means.
+   */
+  cleanup(): Mithril.Children {
+    return (
+      <div className="Form-group LanguageDetection-cleanup">
+        <Button className="Button" icon="fas fa-trash" loading={this.deleting} onclick={() => this.delete()}>
+          {trans('cleanup.button')}
+        </Button>
+        <p className="helpText">{trans('cleanup.button_help')}</p>
+        {this.outcomeMessage()}
+      </div>
+    );
+  }
+
+  /**
+   * What the last run did, in the three outcomes `Api\CleanupController` distinguishes plus the
+   * failure. Retention being switched off is reported rather than shown as "nothing was deleted",
+   * because those two sentences would send an admin looking in different places.
+   */
+  outcomeMessage(): Mithril.Children {
+    if (this.outcome === null) return null;
+
+    if (this.outcome === false) return <p className="helpText LanguageDetection-cleanup-failed">{trans('cleanup.failed')}</p>;
+
+    if (this.outcome.days === null) return <p className="helpText">{trans('cleanup.retention_disabled')}</p>;
+
+    if (this.outcome.deleted === 0) return <p className="helpText">{trans('cleanup.nothing_to_delete')}</p>;
+
+    return <p className="helpText">{trans('cleanup.deleted', { count: count(this.outcome.deleted), days: this.outcome.days })}</p>;
+  }
+
+  delete() {
+    if (this.deleting) return;
+
+    // `extractText` because `confirm` needs a string and a translation is a nested array of vnodes.
+    if (!confirm(extractText(trans('cleanup.confirm')))) return;
+
+    this.deleting = true;
+    this.outcome = null;
+
+    app
+      .request<CleanupResult>({
+        method: 'POST',
+        url: app.forum.attribute<string>('apiUrl') + '/language-detection/cleanup',
+      })
+      .then((result) => {
+        this.outcome = result;
+        this.deleting = false;
+        m.redraw();
+      })
+      .catch(() => {
+        // `app.request` has already reported the error; this is what takes the button out of its
+        // loading state and says, where the result would have been, that nothing was deleted.
+        this.outcome = false;
+        this.deleting = false;
+        m.redraw();
+      });
   }
 
   /**

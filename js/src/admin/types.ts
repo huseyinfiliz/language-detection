@@ -99,3 +99,14 @@ export interface MissingPayload {
 export interface IpDataset {
   date: string | null;
 }
+
+/**
+ * What `POST /api/language-detection/cleanup` answers -- `Api\CleanupController`.
+ *
+ * `days` is null when retention is switched off, and that is a different outcome from a run that
+ * found nothing old enough: the first means this forum keeps its rows for ever.
+ */
+export interface CleanupResult {
+  days: number | null;
+  deleted: number;
+}

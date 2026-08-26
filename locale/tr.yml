@@ -91,6 +91,10 @@ huseyinfiliz-language-detection:
 
     cleanup:
       command_description: Yapılandırılan saklama süresinden daha eski dil algılama istatistiklerini siler.
+      button: Eski istatistikleri şimdi sil
+      button_help: Kaydedilmiş saklama süresinden daha eski kayıtları siler. Yukarıdaki süreyi değiştirdiyseniz önce kaydedin. Bu işlem geri alınamaz.
+      confirm: Saklama süresinden daha eski tüm istatistik kayıtları silinsin mi? Bu işlem geri alınamaz.
       retention_disabled: İstatistiklerin hiçbir zaman silinmemesi ayarlandığı için hiçbir kayıt kaldırılmadı.
       deleted: "{days} günden eski {count} istatistik kaydı silindi."
       nothing_to_delete: Silinecek kadar eski istatistik yok.
+      failed: Eski istatistikler silinemedi.
