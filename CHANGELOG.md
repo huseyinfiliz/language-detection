@@ -38,3 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so `de`, `de-DE` and `de-AT` add up to one suggestion rather than three small ones.
   Languages Flarum publishes no single pack for are still reported, without a package,
   rather than being quietly dropped.
+- Two administrator-only JSON endpoints, `GET /api/language-detection/statistics` and
+  `GET /api/language-detection/missing`, both accepting `?days=7|30|90`. The first returns
+  the totals, the per-language and per-country breakdowns and a day-by-day trend with quiet
+  days filled in; the second returns the missing-languages report. Requests are split three
+  ways -- served, unserved, and visitors who stated no language preference at all -- so the
+  totals add up without the largest bucket on most forums being miscounted as unserved.
