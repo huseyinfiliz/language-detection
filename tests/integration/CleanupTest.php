@@ -125,7 +125,7 @@ class CleanupTest extends TestCase
         $this->setting(self::SETTING, '30');
         $this->seed([100]);
 
-        $response = $this->send($this->request('POST', '/api/language-detection/cleanup'));
+        $response = $this->send($this->request('POST', '/api/language-detection/cleanup', ['authenticatedAs' => 2]));
 
         $this->assertSame(403, $response->getStatusCode());
 
