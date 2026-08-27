@@ -23,8 +23,8 @@ use Psr\Http\Message\ServerRequestInterface;
  * branch of the search.
  *
  * The fixture is laid out below so it can be read without a hex editor. `\0\0` is the format's
- * "nobody holds this" marker (HANDOFF.md §3), and both files begin and end with one because
- * the format is contiguous and exhaustive rather than a list of islands.
+ * "nobody holds this" marker, and both files begin and end with one because the format is
+ * contiguous and exhaustive rather than a list of islands.
  *
  *     ip4.dat -- 6-byte records, 4-byte big-endian start + 2 country characters
  *       00 00 00 00  \0\0     everything below the first allocation

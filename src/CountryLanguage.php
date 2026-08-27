@@ -14,14 +14,11 @@ namespace HuseyinFiliz\LanguageDetection;
 /**
  * Turns a country into the languages a visitor from it is likely to read.
  *
- * The answer is a list of *candidates*, not a decision: what comes back is handed to
- * `LocaleMatcher` exactly as browser tags are, so IP-based candidates inherit subtag
- * truncation, the code aliases and the unambiguous-sibling rule for free, and there stays
- * one place in the extension that decides what "installed" means.
+ * The answer is a list of *candidates*, not a decision: it is handed to `LocaleMatcher` exactly as
+ * browser tags are, so IP-based candidates inherit subtag truncation, the code aliases and the
+ * unambiguous-sibling rule for free.
  *
- * The map itself lives in `resources/countries.php` and is documented there -- including
- * why the majority language leads each chain, and why entries after `en` are reachable
- * rather than dead weight. It is not admin-configurable.
+ * The map lives in `resources/countries.php` and is documented there. It is not admin-configurable.
  */
 class CountryLanguage
 {
@@ -57,10 +54,9 @@ class CountryLanguage
     protected function map(): array
     {
         if ($this->map === null) {
-            // `require`, not `require_once`: a second `require_once` of the same file
-            // returns `true` rather than the array, which is a trap worth avoiding even
-            // though this is memoised. A missing map degrades to no candidates at all --
-            // browser detection then carries the extension on its own.
+            // `require`, not `require_once`: a second `require_once` of the same file returns
+            // `true` rather than the array. A missing map degrades to no candidates at all, and
+            // browser detection carries the extension on its own.
             $map = is_file($this->path) ? require $this->path : null;
 
             $this->map = is_array($map) ? $map : [];

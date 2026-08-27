@@ -18,11 +18,10 @@ use Psr\Http\Message\ServerRequestInterface;
  * The admin page's "delete old statistics now" button.
  *
  * `POST`, and the only endpoint here that writes anything. It shares `AbstractController` for the
- * `assertAdmin()` alone -- the `days` whitelist is irrelevant to it, because the period deleted is
- * the saved `retention_days` setting and never a number out of the request. A URL that could name
- * its own cutoff would be a URL that could empty the table.
+ * `assertAdmin()` alone: the period deleted is the saved `retention_days` setting and never a number
+ * out of the request, because a URL that could name its own cutoff could empty the table.
  *
- * Numbers come back rather than a sentence: the admin's browser has the locale files and can say
+ * Numbers come back rather than a sentence -- the admin's browser has the locale files and can say
  * "deleted 412 rows older than 90 days" in the admin's own language, which this cannot.
  */
 class CleanupController extends AbstractController

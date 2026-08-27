@@ -23,14 +23,12 @@ return [
 
     new Extend\Locales(__DIR__.'/locale'),
 
-    // Detection has to happen after the actor is known and before core decides the
-    // locale, and this is the only position that satisfies both. Running after
-    // `SetLocale` would mean overwriting a choice the visitor had already made.
+    // Before `SetLocale`, which is the only position that works: the actor is authenticated
+    // by then, and core still gets the last word on a visitor's own explicit choice.
     (new Extend\Middleware('forum'))
         ->insertBefore(SetLocale::class, Middleware\DetectLanguage::class),
 
-    // Read-only, administrator-only, and outside JSON:API on purpose -- see
-    // `Api\AbstractController`, which is also where the `days` parameter is whitelisted.
+    // Administrator-only -- see `Api\AbstractController`, which also whitelists `days`.
     (new Extend\Routes('api'))
         ->get(
             '/language-detection/statistics',
@@ -42,17 +40,14 @@ return [
             'huseyinfiliz-language-detection.missing',
             Api\MissingLanguagesController::class
         )
-        // The one endpoint that writes. It deletes by the saved `retention_days` setting and takes
-        // no period from the request, so there is nothing here a caller can widen.
         ->post(
             '/language-detection/cleanup',
             'huseyinfiliz-language-detection.cleanup',
             Api\CleanupController::class
         ),
 
-    // Daily, because the unit of the data is a day: running it more often could only ever delete
-    // rows the previous run already had. Forums without a configured scheduler still have the
-    // command by hand and the button on the admin page, which is why all three share `Cleanup`.
+    // Daily, because the unit of the data is a day. Forums with no scheduler still have the
+    // command by hand and the button on the admin page, and all three share `Cleanup`.
     (new Extend\Console())
         ->command(Console\CleanupCommand::class)
         ->schedule(Console\CleanupCommand::class, function (Event $event) {

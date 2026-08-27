@@ -32,9 +32,7 @@ const TABS: TabSpec[] = [
 ];
 
 /**
- * A key per window, so that the keys stay literal strings that can be grepped against both locale
- * files. `WINDOWS` is the list the buttons are drawn from and mirrors the API's whitelist; adding a
- * window there without adding its label here would render `undefined` on a button.
+ * A key per window, so the keys stay literal strings that can be grepped against `locale/en.yml`.
  */
 const WINDOW_LABELS: Record<number, string> = {
   7: 'dashboard.window_7',
@@ -43,16 +41,15 @@ const WINDOW_LABELS: Record<number, string> = {
 };
 
 /**
- * Everything the previous phases collected, on one page.
+ * The statistics dashboard.
  *
  * Both endpoints are fetched together and re-fetched together when the window changes, so the cards,
- * the tables and the chart are always describing one instant. Fetching per tab would be cheaper and
- * would let a stale card sit above a fresh table.
+ * the tables and the chart always describe one instant. Fetching per tab would be cheaper and would
+ * let a stale card sit above a fresh table.
  */
 export default class LanguageDetectionPage extends ExtensionPage<ExtensionPageAttrs> {
   /**
-   * Which tab is open. Local state rather than a route: nothing here is worth a deep link, and a
-   * route would mean a resolver plus a second registration for no gain.
+   * Which tab is open. Local state rather than a route: nothing here is worth a deep link.
    */
   tab: Tab = 'overview';
 
@@ -92,14 +89,14 @@ export default class LanguageDetectionPage extends ExtensionPage<ExtensionPageAt
   }
 
   tabContent(): Mithril.Children {
-    // The settings do not come from the API, so they are readable while it is loading and after it
-    // has failed -- which is the state a forum is in when the endpoints are unreachable.
+    // The settings do not come from the API, so they stay readable while it is loading and after it
+    // has failed.
     if (this.tab === 'settings') return <SettingsTab page={this} />;
 
     if (this.failed) return this.failure();
 
-    // Bound to locals so that the null checks below narrow something TypeScript cannot lose track
-    // of: the overview branch calls a method between the check and the reads.
+    // Bound to locals so the null checks below narrow something TypeScript cannot lose track of: the
+    // overview branch calls a method between the check and the reads.
     const statistics = this.statistics;
     const missing = this.missing;
 
@@ -141,8 +138,8 @@ export default class LanguageDetectionPage extends ExtensionPage<ExtensionPageAt
         m.redraw();
       })
       .catch(() => {
-        // `app.request` has already reported the error itself; this is what stops the page sitting
-        // on a spinner for ever and says so where the numbers would have been.
+        // `app.request` has already reported the error itself; this is what stops the page sitting on
+        // a spinner for ever.
         this.failed = true;
         this.refreshing = false;
         m.redraw();

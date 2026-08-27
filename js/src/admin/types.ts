@@ -1,25 +1,22 @@
 /**
  * The shapes the two admin endpoints return.
  *
- * Every field name here is the PHP array key verbatim -- `src/Statistics.php` for the statistics
- * payload, `LanguageCatalog::missing()` for the missing one -- so that there is no translation
- * layer between the two halves to fall out of step. Renaming anything in this file means renaming
- * it there, and the other way round.
+ * Every field name is the PHP array key verbatim -- `src/Statistics.php` for the statistics payload,
+ * `LanguageCatalog::missing()` for the missing one -- so there is no translation layer between the two
+ * halves to fall out of step.
  */
 
 /**
  * The windows the dashboard offers, and the only ones the API accepts.
- *
- * `Api\AbstractController::WINDOWS` is the same three numbers; anything else becomes 30 there, so
- * a value added here without being added there would quietly draw the default.
+ * `Api\AbstractController::WINDOWS` is the same three numbers.
  */
 export const WINDOWS = [7, 30, 90];
 
 export interface Summary {
   requests: number;
   /**
-   * Daily visitors, summed. The column is incremented once per visitor per day, so somebody who
-   * reads on three days contributes three -- which is why the card that shows this says so.
+   * Daily visitors, summed. The column is incremented once per visitor per day, so somebody who reads
+   * on three days contributes three -- which is why the card that shows this says so.
    */
   visitors: number;
   /** Distinct languages that were actually named. The `''` bucket is not one of them. */
@@ -73,9 +70,8 @@ export interface MissingRow {
   name: string | null;
   native: string | null;
   /**
-   * Null when Flarum publishes no single pack for the language -- either none exists at all, or
-   * several do and picking one would be a guess. The report does not distinguish the two cases, so
-   * the label for this must not claim to either.
+   * Null when Flarum publishes no single pack for the language -- either none exists, or several do
+   * and picking one would be a guess. The report does not distinguish the two, so nor may the label.
    */
   package: string | null;
   requests: number;
@@ -92,9 +88,8 @@ export interface MissingPayload {
 /**
  * `Content\AdminPayload`, read out of `app.data`.
  *
- * Three states, and they say different things: the whole value is null when no dataset is
- * installed at all, and `date` is null when one is installed but recorded no build date. Only the
- * first means IP lookup is inactive.
+ * Three states: the whole value is null when no dataset is installed, and `date` is null when one is
+ * installed but recorded no build date. Only the first means IP lookup is inactive.
  */
 export interface IpDataset {
   date: string | null;
@@ -103,8 +98,8 @@ export interface IpDataset {
 /**
  * What `POST /api/language-detection/cleanup` answers -- `Api\CleanupController`.
  *
- * `days` is null when retention is switched off, and that is a different outcome from a run that
- * found nothing old enough: the first means this forum keeps its rows for ever.
+ * `days` is null when retention is switched off, which is a different outcome from a run that found
+ * nothing old enough.
  */
 export interface CleanupResult {
   days: number | null;

@@ -10,3 +10,8 @@ tests/.phpunit.result.cache
 .idea/*
 .vscode
 js/coverage-ts
+
+# Only English is tracked. Every other language belongs in a community language pack
+# (flarum-lang/*), which is where forum owners already look for translations.
+locale/*.yml
+!locale/en.yml

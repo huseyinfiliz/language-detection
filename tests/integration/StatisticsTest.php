@@ -213,10 +213,9 @@ class StatisticsTest extends TestCase
     {
         // The single most valuable row in the table. This forum has no Japanese, so the visitor
         // is served the forum default -- and the request for `ja` is recorded anyway. That gap
-        // between requested and installed is what Phase 7 reads to tell an admin which language
-        // pack would be worth adding. Had the resolved locale been recorded instead, the
-        // statistic could only ever report languages the forum already has, and the report would
-        // be structurally incapable of suggesting anything.
+        // between requested and installed is what `LanguageCatalog` reads to tell an admin which
+        // language pack would be worth adding. Had the resolved locale been recorded instead, the
+        // statistic could only ever report languages the forum already has.
         $response = $this->send($this->request('GET', '/')->withHeader('Accept-Language', 'ja'));
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -325,13 +324,12 @@ class StatisticsTest extends TestCase
     {
         // Not a page view, so the `GET` guard returns before counting.
         //
-        // The route matters, and `POST /` would have made this test unfalsifiable. With no route
-        // to resolve, the exception unwinds past this middleware before the response exists --
-        // so nothing would be counted whether the guard were there or not, which is why Phase 4
-        // declined the equivalent cookie assertion (§12 Phase 4 decision 7). `/global-logout` is
-        // a real forum POST route whose controller returns an `EmptyResponse`, and
-        // `requestAsUser()` sets `bypassCsrfToken`, so the request completes normally. Remove the
-        // guard and this genuinely writes a row.
+        // The route matters, and `POST /` would have made this test unfalsifiable. With no route to
+        // resolve, the exception unwinds past this middleware before the response exists, so
+        // nothing would be counted whether the guard were there or not. `/global-logout` is a real
+        // forum POST route whose controller returns an `EmptyResponse`, and `requestAsUser()` sets
+        // `bypassCsrfToken`, so the request completes normally. Remove the guard and this genuinely
+        // writes a row.
         $this->send($this->request('POST', '/global-logout', ['authenticatedAs' => 2]));
 
         $this->assertSame(0, $this->rowCount());

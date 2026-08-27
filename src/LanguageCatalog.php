@@ -18,27 +18,19 @@ use Illuminate\Database\ConnectionInterface;
  * Which languages visitors asked for that this forum cannot serve them.
  *
  * This is what the statistics table was filled for. `Analytics` records the locale each visitor
- * *asked for* rather than the one the forum managed to serve, and the difference between those two
- * is exactly this report: a forum with no Japanese pack accumulates `ja` rows, and an admin who
- * sees forty of them learns something they had no other way of finding out.
+ * *asked for* rather than the one the forum managed to serve, and the difference is exactly this
+ * report: a forum with no Japanese pack accumulates `ja` rows.
  *
- * Two questions are answered here, and they are independent -- collapsing them is the one mistake
- * that turns this report from incomplete into wrong:
+ * Two independent questions are answered here, and collapsing them is the one mistake that turns this
+ * report from incomplete into wrong:
  *
- *   1. *Is this tag served by anything installed?* That is `LocaleMatcher::match()`, and nothing
- *      else. It is the same question the middleware asked at detection time, so the answer here
- *      agrees with what the visitor actually got, and there stays one place in the extension that
- *      decides what "installed" means.
- *   2. *Which pack would serve it?* That is this catalog, and it is a different question with a
- *      different answer. `pt-br` belongs to the `pt-BR` pack -- but on a forum with `pt` installed
- *      the visitor was served Portuguese, so the tag is not missing at all and must not appear.
+ *   1. *Is this tag served by anything installed?* That is `LocaleMatcher::match()` and nothing else,
+ *      so the answer agrees with what the visitor actually got.
+ *   2. *Which pack would serve it?* That is this catalog. `pt-br` belongs to the `pt-BR` pack -- but
+ *      on a forum with `pt` installed the visitor was served Portuguese, so the tag is not missing.
  *
  * Hence the order in `missingFrom()`: filter by question 1, *then* group by question 2. Grouped
- * first, a single row could mix tags that were served with tags that were not, and there would be
- * no honest way to report it.
- *
- * @see Analytics for why the requested locale is what gets recorded
- * @see LocaleMatcher for what "installed" means
+ * first, a single row could mix served tags with unserved ones.
  */
 class LanguageCatalog
 {
@@ -89,11 +81,9 @@ class LanguageCatalog
             ->groupBy('locale');
 
         if ($days !== null) {
-            // `$days - 1`, so that a window of 7 covers seven calendar days *including* today
-            // rather than eight. Phase 8 puts a seven-day figure next to a seven-bar chart, and
-            // the two have to agree. The clamp keeps a zero or a negative from quietly asking
-            // for a window in the future, which would report nothing at all and look like good
-            // news.
+            // `$days - 1`, so a window of 7 covers seven calendar days *including* today rather
+            // than eight -- the dashboard puts a seven-day figure next to a seven-bar chart. The
+            // clamp keeps a zero or a negative from asking for a window in the future.
             $query->where(
                 'date',
                 '>=',
@@ -119,13 +109,11 @@ class LanguageCatalog
      * The same report, from volumes already gathered.
      *
      * Split out from `missing()` so that everything worth arguing about -- what counts as served,
-     * which pack answers a tag, how tags roll up, how ties break -- can be tested without a
-     * database. `missing()` is then only the query.
+     * which pack answers a tag, how tags roll up, how ties break -- can be tested without a database.
      *
      * A row's `locale` is the catalog key where one was found, spelled as the pack publishes it
-     * (`pt-BR`, `es_AR`, `zh-Hans`) so that it is directly usable and directly installable. Where
-     * no pack answers, it is the requested tag itself: that is all there is to report, and
-     * reporting it is the point -- see `keyFor()`.
+     * (`pt-BR`, `es_AR`, `zh-Hans`) so that it is directly installable. Where no pack answers, it is
+     * the requested tag itself -- see `keyFor()`.
      *
      * @param array<string, array{requests: int, visitors: int}> $volumes requested tag => totals
      *
@@ -195,21 +183,17 @@ class LanguageCatalog
     /**
      * The catalog key whose pack would serve a requested tag, verbatim.
      *
-     * Deliberately narrower than `LocaleMatcher`: exact match on the folded index, then
-     * progressive truncation, and then null. There is no unambiguous-sibling tier, because the
-     * catalog is not a forum's installed set -- every regional variant Flarum publishes is in it,
-     * so `sr` would be asked to choose between `sr-Cyrl` and `sr-Latn` and `zh` between
-     * `zh-Hans` and `zh-Hant`, every time. Picking one on an admin's behalf would be a guess
-     * presented as a recommendation.
+     * Deliberately narrower than `LocaleMatcher`: exact match on the folded index, then progressive
+     * truncation, then null. There is no unambiguous-sibling tier, because the catalog holds every
+     * regional variant Flarum publishes -- `sr` would be asked to choose between `sr-Cyrl` and
+     * `sr-Latn` every time, and picking one would be a guess presented as a recommendation.
      *
-     * Null therefore covers two different situations, and both are reported rather than dropped:
-     * a language Flarum has no pack for at all (`sw`, `zu`), and a macrolanguage with more than
-     * one candidate pack (`no`, `ku`, `sr`, `zh`). "Forty-seven visitors asked for `no`" is worth
-     * showing even with no single package to link -- and demand nobody can act on is precisely
-     * the demand an admin most needs to see, so suppressing it would make the totals lie.
+     * Null therefore covers two situations, both reported rather than dropped: a language Flarum has
+     * no pack for (`sw`, `zu`), and a macrolanguage with more than one candidate pack (`no`, `ku`,
+     * `sr`, `zh`). Demand nobody can act on is precisely the demand an admin most needs to see.
      *
-     * Note that a *served* macrolanguage never reaches here: `LocaleMatcher` resolves `no` to
-     * `nb` when Bokmål alone is installed, so `missingFrom()` has already filtered it out.
+     * A *served* macrolanguage never reaches here: `LocaleMatcher` resolves `no` to `nb` when Bokmål
+     * alone is installed, so `missingFrom()` has already filtered it out.
      */
     public function keyFor(string $code): ?string
     {
@@ -288,16 +272,13 @@ class LanguageCatalog
     /**
      * Fold a code into a form safe to compare -- never to output.
      *
-     * The same three lines as `LocaleMatcher::normalize()`, which is `protected` and no part of
-     * that class's contract. Repeating them is the honest choice, and the same one `Analytics`
-     * made: what is being compared here is a requested tag against a *published catalog*, not
-     * against a forum's installed locales, and tying the two together would mean a future change
-     * to matching silently re-points every package link.
+     * The same three lines as `LocaleMatcher::normalize()`, repeated rather than shared for the same
+     * reason `Analytics` repeats them: what is compared here is a requested tag against a *published
+     * catalog*, not against a forum's installed locales.
      *
-     * `CODE_ALIASES` is read rather than copied, and mind its direction -- it maps catalog key to
-     * the code a browser sends (`uzb` => `uz`), so applying it to both sides is what files
-     * catalog `uzb` under `uz` and lets a requested `uz` find it. A browser that sends `uzb`
-     * verbatim folds to the same place.
+     * `CODE_ALIASES` is read rather than copied, and mind its direction -- it maps catalog key to the
+     * code a browser sends (`uzb` => `uz`), so applying it to both sides files catalog `uzb` under
+     * `uz` and lets a requested `uz` find it.
      */
     protected function fold(string $code): string
     {

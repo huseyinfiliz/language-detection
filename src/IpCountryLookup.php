@@ -16,27 +16,22 @@ use Psr\Http\Message\ServerRequestInterface;
 /**
  * Works out which country a request came from, without calling anything.
  *
- * Two signals, in this order: a country header set by the CDN or web server in front of
- * the forum, then the bundled dataset. The header comes first even though it is spoofable
- * -- and even when the connecting address is private -- because it is the only signal that
- * survives a reverse proxy. Flarum 1.x resolves the visitor's address from `REMOTE_ADDR`
- * alone (`Http\Middleware\ProcessIp`, which honours no `X-Forwarded-For`), so behind
- * Cloudflare, a tunnel or any other proxy the address this class is handed may well be the
- * proxy's own, while `CF-IPCountry` still describes the visitor. Spoofing it changes
- * nothing but which language is offered, and a visitor can already send any
- * `Accept-Language` they like, so there is nothing to protect here.
+ * Two signals, in this order: a country header set by the CDN or web server in front of the forum,
+ * then the bundled dataset. The header comes first even though it is spoofable, because it is the only
+ * signal that survives a reverse proxy -- Flarum 1.x resolves the visitor's address from `REMOTE_ADDR`
+ * alone (`Http\Middleware\ProcessIp` honours no `X-Forwarded-For`), so behind Cloudflare or a tunnel
+ * the address handed to this class may be the proxy's own while `CF-IPCountry` still describes the
+ * visitor. Spoofing it changes nothing but which language is offered, and a visitor can already send
+ * any `Accept-Language` they like.
  *
- * Whatever comes back is a country, never a language: `CountryLanguage` and `LocaleMatcher`
- * decide what to do about it. The address itself is read, used and dropped -- never stored,
- * never logged.
+ * Whatever comes back is a country, never a language: `CountryLanguage` and `LocaleMatcher` decide
+ * what to do about it. The address itself is read, used and dropped -- never stored, never logged.
  */
 class IpCountryLookup
 {
     /**
-     * Country headers set by the edge, in the order they are tried.
-     *
-     * Order between them barely matters -- a forum sits behind one CDN, not five -- so this
-     * is simply the order §3 lists them in.
+     * Country headers set by the edge, in the order they are tried. Order barely matters, since a
+     * forum sits behind one CDN rather than five.
      */
     const HEADERS = [
         'CF-IPCountry',
@@ -47,8 +42,8 @@ class IpCountryLookup
     ];
 
     /**
-     * The same signal from an nginx or Apache GeoIP module, which arrives as a server
-     * parameter rather than as a header.
+     * The same signal from an nginx or Apache GeoIP module, which arrives as a server parameter
+     * rather than as a header.
      */
     const SERVER_PARAMS = [
         'GEOIP_COUNTRY_CODE',
@@ -56,14 +51,13 @@ class IpCountryLookup
     ];
 
     /**
-     * Codes that are shaped like a country but assert the absence of one.
+     * Codes that are shaped like a country but assert the absence of one: Cloudflare answers `XX`
+     * when it cannot place an address and `T1` for Tor exit nodes, and `ZZ` is the RIR files'
+     * stand-in for "no country".
      *
-     * Cloudflare answers `XX` when it cannot place an address and `T1` for Tor exit nodes;
-     * `ZZ` is the RIR files' stand-in for "no country". Rejected wherever they turn up, so
-     * neither a header nor the dataset can pass a placeholder off as a country. Note that
-     * the RIR extras `EU` and `AP` are *not* rejected: they are real allocations that
-     * simply span countries, and `resources/countries.php` leaves them unmapped on purpose,
-     * which yields no candidates without pretending the lookup failed.
+     * The RIR extras `EU` and `AP` are *not* rejected -- they are real allocations that simply span
+     * countries, and `resources/countries.php` leaves them unmapped, which yields no candidates
+     * without pretending the lookup failed.
      */
     const PLACEHOLDERS = ['XX', 'T1', 'ZZ'];
 
@@ -72,9 +66,9 @@ class IpCountryLookup
     const FILE_INFO = 'ip-data.php';
 
     /**
-     * Record and key widths, per §3: a big-endian range start followed by two ASCII country
-     * characters, with no end address and no length -- the files are contiguous, so the next
-     * record's start is this record's end.
+     * Record and key widths: a big-endian range start followed by two ASCII country characters, with
+     * no end address and no length -- the files are contiguous, so the next record's start is this
+     * record's end.
      */
     const RECORD_V4 = 6;
     const RECORD_V6 = 10;
@@ -116,9 +110,6 @@ class IpCountryLookup
 
     /**
      * The dataset's answer for one address, with no headers involved.
-     *
-     * Public because it is the whole of the dataset path and worth testing without an HTTP
-     * request in the way.
      */
     public function countryForIp(?string $ip): ?string
     {
@@ -128,9 +119,8 @@ class IpCountryLookup
             return null;
         }
 
-        // IPv6 records key on the top 64 bits only (§3): a /64 is the smallest block anyone
-        // is assigned, so the lower half never changes the answer and halving the key halves
-        // the file.
+        // IPv6 records key on the top 64 bits only: a /64 is the smallest block anyone is
+        // assigned, so the lower half never changes the answer and halving the key halves the file.
         return strlen($address) === 4
             ? $this->search(self::FILE_V4, self::RECORD_V4, self::KEY_V4, $address)
             : $this->search(self::FILE_V6, self::RECORD_V6, self::KEY_V6, substr($address, 0, self::KEY_V6));
@@ -152,9 +142,9 @@ class IpCountryLookup
             return null;
         }
 
-        // The build date is generated into this file rather than read from `filemtime()`,
-        // because git sets modification times to checkout time: the notice would otherwise
-        // report the date the forum was installed and quietly claim the data is fresh.
+        // The build date is generated into this file rather than read from `filemtime()`, because
+        // git sets modification times to checkout time -- the notice would otherwise report the date
+        // the forum was installed and claim the data is fresh.
         $info = require $path;
 
         return is_array($info) ? $info : null;
@@ -174,18 +164,17 @@ class IpCountryLookup
 
         $address = (string) inet_pton($ip);
 
-        // An IPv4 address in IPv6 clothing is what a dual-stack listener hands PHP for an
-        // IPv4 client. Unwrapping it here is not a nicety: `::ffff:0:0/96` is itself a
-        // reserved range, so the check below would throw away every such address, and
-        // unwrapping first is also what makes `::ffff:192.168.1.1` recognisably private.
+        // An IPv4 address in IPv6 clothing is what a dual-stack listener hands PHP for an IPv4
+        // client. Unwrapping it is not a nicety: `::ffff:0:0/96` is itself a reserved range, so the
+        // check below would discard every such address, and unwrapping first is also what makes
+        // `::ffff:192.168.1.1` recognisably private.
         if (strlen($address) === 16 && strncmp($address, self::MAPPED_V4_PREFIX, 12) === 0) {
             $address = substr($address, 12);
             $ip = (string) inet_ntop($address);
         }
 
-        // Loopback, private and reserved ranges all fall out here -- including `127.0.0.1`,
-        // which is what `ProcessIp` uses when there is no `REMOTE_ADDR` at all, so a
-        // console or misconfigured request becomes a clean null instead of a lookup.
+        // Loopback, private and reserved ranges all fall out here -- including `127.0.0.1`, which is
+        // what `ProcessIp` uses when there is no `REMOTE_ADDR` at all.
         if (! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
             return null;
         }
@@ -224,9 +213,7 @@ class IpCountryLookup
     /**
      * Binary search for the last record whose range starts at or before the address.
      *
-     * The file is contiguous and exhaustive, so there is always such a record for any
-     * address inside the file's bounds, and "unknown" is spelled as a record rather than as
-     * a hole.
+     * The file is contiguous and exhaustive, so "unknown" is spelled as a record rather than a hole.
      */
     protected function search(string $file, int $recordSize, int $keySize, string $key): ?string
     {
@@ -267,12 +254,11 @@ class IpCountryLookup
                     return null;
                 }
 
-                // Keys are compared as raw big-endian bytes and never unpacked into
-                // integers. `unpack('J')` on an IPv6 key at or above `8000::` yields a
-                // negative number on every 64-bit build of PHP, which would silently invert
-                // the search for a sixteenth of the address space; big-endian byte order
-                // makes a byte-wise comparison identical to an unsigned numeric one, and
-                // `strcmp` is binary-safe, so this is both correct and shorter.
+                // Keys are compared as raw big-endian bytes and never unpacked into integers.
+                // `unpack('J')` on an IPv6 key at or above `8000::` yields a negative number on
+                // every 64-bit build of PHP, which would invert the search for a sixteenth of the
+                // address space. Big-endian byte order makes a byte-wise comparison identical to an
+                // unsigned numeric one, and `strcmp` is binary-safe.
                 if (strcmp(substr($record, 0, $keySize), $key) <= 0) {
                     $found = substr($record, $keySize, 2);
                     $low = $middle + 1;
@@ -288,10 +274,8 @@ class IpCountryLookup
     }
 
     /**
-     * A country code, if that is what this really is.
-     *
-     * Guards the dataset's `\0\0` unknown marker and anything a proxy might put in a header,
-     * so callers never have to.
+     * A country code, if that is what this really is. Guards the dataset's `\0\0` unknown marker and
+     * anything a proxy might put in a header, so callers never have to.
      */
     protected function country(?string $value): ?string
     {

@@ -17,33 +17,24 @@ use Illuminate\Database\ConnectionInterface;
 /**
  * Everything the admin dashboard shows, read back out of the statistics table.
  *
- * Reads only. No writes, no deletes -- deleting old rows is the cleanup command's job, and this
- * class has no business knowing that retention exists.
- *
- * Three things here are easy to get wrong, and all three are decisions rather than details.
+ * Reads only -- deleting old rows is `Cleanup`'s job, and this class has no business knowing that
+ * retention exists. Three things here are decisions rather than details:
  *
  * **The summary is derived from the rows the tables render, not queried separately.** `report()`
- * fetches the grouped languages and countries once and hands them to `summaryFrom()`, so a card
- * that disagrees with the table below it is not a bug that can happen. It also means the
- * distinct-language count is the number of table rows rather than a `COUNT(DISTINCT locale)` --
- * which is the safer of the two, because SQL counts `''` as a value and would report one language
- * more than the forum has on every forum that has any traffic at all.
+ * fetches the grouped languages and countries once and hands them to `summaryFrom()`, so a card that
+ * disagrees with the table below it cannot happen. It also makes the distinct-language count the
+ * number of table rows rather than a `COUNT(DISTINCT locale)`, which would count `''` as a language.
  *
  * **`''` is a third case, not an unserved one.** A row with an empty locale is a visitor whose
- * `Accept-Language` said nothing usable, and on most forums it is the largest bucket in the table.
- * It is real traffic and it stays, but it did not ask for a language, so it can be neither served
- * nor unserved: counted as unserved it would put most forums at "80% of visitors unserved" and
- * send an admin looking for a problem that does not exist. So requests are split three ways --
- * `served`, `unserved`, `unstated` -- which add up to `requests` exactly, with nothing to explain
- * away. In the languages table the same distinction is a `served` flag of true, false or **null**.
+ * `Accept-Language` said nothing usable, and on most forums it is the largest bucket in the table. It
+ * did not ask for a language, so it can be neither served nor unserved -- counted as unserved it would
+ * put most forums at "80% of visitors unserved". Requests therefore split three ways (`served`,
+ * `unserved`, `unstated`) which add up to `requests` exactly, and the languages table carries a
+ * `served` flag of true, false or **null**.
  *
  * **`visitors` is daily visitors summed, and is not a count of people.** `Analytics` increments
  * `unique_visitors` once per visitor per day, so a reader who comes back on three days contributes
- * three. Over a 30-day window the figure is meaningful and it is not 30-day uniques. The field name
- * matches the column and the honesty lives in the locale strings, because inventing a second name
- * for the same number would only move the confusion somewhere less visible.
- *
- * @see LanguageCatalog for the other half of the dashboard -- the languages that are missing
+ * three. The field name matches the column and the honesty lives in the locale strings.
  */
 class Statistics
 {
@@ -63,16 +54,12 @@ class Statistics
     /**
      * The whole dashboard payload for a window of days.
      *
-     * The clock is read once, here, and passed down. Four sections each calling `Carbon::now()`
-     * for themselves would be four windows, and a request that crossed midnight between the first
-     * query and the last would ship a payload describing two different weeks -- with a trend whose
-     * length no longer matched the total printed above it.
+     * The clock is read once, here, and passed down. Four sections each calling `Carbon::now()` would
+     * be four windows, and a request crossing midnight would ship a payload describing two different
+     * weeks.
      *
-     * There are no row caps on any of this, deliberately. Every dimension is naturally bounded --
-     * countries by about 250, distinct locales by what browsers actually send -- and a silent
-     * top-N would make an admin's totals disagree with the table they are printed above. If a cap
-     * ever becomes necessary it has to arrive as a visible field in the payload, not as a
-     * `limit()` nobody notices.
+     * There are no row caps on any of this, deliberately: every dimension is naturally bounded, and a
+     * silent top-N would make an admin's totals disagree with the table they are printed above.
      *
      * @return array<string, mixed>
      */
@@ -146,10 +133,9 @@ class Statistics
     /**
      * Totals over rows already shaped by `languagesFrom()` and `countriesFrom()`.
      *
-     * `languages` counts the rows that named a language, so it excludes `''` by construction
-     * rather than by remembering to exclude it. `countries` excludes `''` the same way, because
-     * "unknown" is not a country an admin can do anything with -- but the unknown row itself stays
-     * in the countries table, where it is worth seeing.
+     * `languages` counts the rows that named a language, so it excludes `''` by construction.
+     * `countries` excludes `''` the same way, because "unknown" is not a country an admin can act on
+     * -- but the unknown row itself stays in the countries table, where it is worth seeing.
      *
      * @param array<int, array<string, mixed>> $languages
      * @param array<int, array<string, mixed>> $countries
@@ -196,10 +182,9 @@ class Statistics
     /**
      * Name each requested locale, say whether the forum could serve it, and order by demand.
      *
-     * "Could the forum serve this?" is `LocaleMatcher::match()` and nothing else -- the same call
-     * the middleware made when the request came in, so this column reports what visitors actually
-     * got rather than a second opinion about it. That is Phase 7's reasoning and it holds here for
-     * the same reason: one place in the extension decides what "installed" means.
+     * "Could the forum serve this?" is `LocaleMatcher::match()` and nothing else -- the same call the
+     * middleware made when the request came in, so this column reports what visitors actually got
+     * rather than a second opinion about it.
      *
      * @param array<string, array{requests: int, visitors: int}> $volumes requested tag => totals
      *
@@ -255,9 +240,8 @@ class Statistics
      * Every day in the window, including the quiet ones.
      *
      * `GROUP BY date` returns only days that have rows, so the gaps are filled here. Shipping the
-     * query's own output would draw a chart in which a forum with traffic on Monday and Friday
-     * shows two adjacent bars -- a quiet week rendered as a busy two-day one, with the x-axis
-     * silently compressed. Zero is a fact about that day and belongs in the payload.
+     * query's own output would draw a forum with traffic on Monday and Friday as two adjacent bars --
+     * a quiet week rendered as a busy two-day one.
      *
      * @param array<string, array{requests: int, visitors: int}> $volumes date => totals
      *
@@ -285,11 +269,8 @@ class Statistics
     }
 
     /**
-     * Busiest first, then alphabetically.
-     *
-     * The tie-break is not cosmetic: MySQL's row order for equal sums is unspecified, so without
-     * it a table of quiet languages would reshuffle between refreshes and any test that asserted
-     * its order would be intermittent.
+     * Busiest first, then alphabetically. The tie-break is not cosmetic: MySQL's row order for equal
+     * sums is unspecified, so without it a table of quiet languages would reshuffle between refreshes.
      *
      * @param array<int, array<string, mixed>> $rows
      *
@@ -349,9 +330,9 @@ class Statistics
     /**
      * Fold a grouped result set into totals keyed by one column.
      *
-     * The `(int)` casts are the point of this method existing. `SUM()` arrives from PDO as a
-     * string, and uncast the payload would ship `"requests": "9"` -- which a JavaScript sort ranks
-     * above `"41"`, so the dashboard would confidently name the wrong busiest language.
+     * The `(int)` casts are the point of this method existing. `SUM()` arrives from PDO as a string,
+     * and uncast the payload would ship `"requests": "9"` -- which a JavaScript sort ranks above
+     * `"41"`, so the dashboard would name the wrong busiest language.
      *
      * @param iterable<object> $rows
      *
@@ -386,12 +367,11 @@ class Statistics
      * How many days back the window reaches.
      *
      * Seven days means today and the six before it, which is what makes a seven-day total and a
-     * seven-bar chart describe the same seven days. `LanguageCatalog::missing()` computes its
-     * cutoff the same way, and `ApiTest` pins the two to the same boundary so that the missing
-     * languages an admin sees are the ones from the window they selected.
+     * seven-bar chart describe the same week. `LanguageCatalog::missing()` computes its cutoff the
+     * same way, so the missing languages an admin sees are the ones from the window they selected.
      *
-     * The clamp stops a zero or a negative asking for a cutoff in the future, which would report
-     * an empty week -- and an empty week looks like good news rather than like a bad argument.
+     * The clamp stops a zero or a negative asking for a cutoff in the future, which would report an
+     * empty week -- and an empty week looks like good news.
      */
     protected function span(int $days): int
     {

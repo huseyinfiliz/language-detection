@@ -18,11 +18,11 @@ use Psr\Http\Message\ServerRequestInterface;
 /**
  * Works out which installed locale a request should be served in.
  *
- * The resolution chain lives here rather than in the middleware, which keeps the ordering
- * rules testable without an HTTP stack: both detection sources are tried here, in the order
- * `detection_order` asks for, and both end at the same `LocaleMatcher`. What comes back is
- * either an exact `getLocales()` key or null, and null means "leave the locale alone" --
- * never a guess, and never `en`, which is not guaranteed to be installed at all.
+ * The resolution chain lives here rather than in the middleware, which keeps the ordering rules
+ * testable without an HTTP stack. Both sources are tried in the order `detection_order` asks for,
+ * and both end at the same `LocaleMatcher`. What comes back is either an exact `getLocales()` key or
+ * null, and null means "leave the locale alone" -- never a guess, and never `en`, which is not
+ * guaranteed to be installed at all.
  */
 class LanguageDetector
 {
@@ -35,12 +35,8 @@ class LanguageDetector
     const SOURCE_IP = 'ip';
 
     /**
-     * The detection sources that exist.
-     *
-     * `detection_order` supplies the order and this supplies the reality: a source the
-     * setting names but this list does not carry is skipped. Both sources are implemented,
-     * so the setting decides which one gets first refusal on a request that either could
-     * answer -- a visitor whose browser asks for German from a Turkish address.
+     * The sources that exist. `detection_order` supplies the order, this supplies the reality:
+     * a source the setting names but this list does not carry is skipped.
      */
     const SOURCES = [self::SOURCE_BROWSER, self::SOURCE_IP];
 
@@ -119,10 +115,9 @@ class LanguageDetector
 
     protected function fromBrowser(ServerRequestInterface $request): ?string
     {
-        // An absent header comes back as an empty string, which the parser reads as no
-        // tags at all, so there is nothing to guard here. The matcher only ever returns a
-        // key it took from `getLocales()`, so there is nothing to validate afterwards
-        // either -- re-checking with `hasLocale()` would only hide a regression.
+        // An absent header comes back as an empty string, which the parser reads as no tags at
+        // all. The matcher only ever returns a key it took from `getLocales()`, so there is
+        // nothing to validate afterwards either.
         return $this->matcher->match(
             $this->parser->parse($request->getHeaderLine('Accept-Language'))
         );
@@ -132,17 +127,15 @@ class LanguageDetector
     {
         $country = $this->lookup->countryFor($request);
 
-        // No country, or a country nobody has mapped a language to, and this source simply
-        // has no opinion -- the next one runs. Nothing distinguishes the two cases here,
-        // and nothing should: they mean the same thing to the caller.
+        // No country, or a country nobody has mapped a language to: this source has no opinion
+        // and the next one runs. The two cases mean the same thing to the caller.
         if ($country === null) {
             return null;
         }
 
-        // Through the same matcher the browser source uses, deliberately: candidate
-        // languages from a country are candidates like any other, so they inherit subtag
-        // truncation, the code aliases and the unambiguous-sibling rule, and there stays one
-        // place in the extension that decides what "installed" means.
+        // Through the same matcher the browser source uses, so candidate languages from a
+        // country inherit subtag truncation, the code aliases and the unambiguous-sibling rule,
+        // and one place in the extension decides what "installed" means.
         return $this->matcher->match($this->countries->candidatesFor($country));
     }
 
@@ -153,9 +146,9 @@ class LanguageDetector
     {
         $default = (string) $this->settings->get(self::SETTINGS_PREFIX.'default_locale');
 
-        // Empty means "whatever the forum default is", which is core's business, not ours:
-        // returning null leaves the locale untouched. A configured locale that is no
-        // longer installed is treated the same way rather than applied blindly.
+        // Empty means "whatever the forum default is", which is core's business: returning null
+        // leaves the locale untouched. A configured locale that is no longer installed is treated
+        // the same way rather than applied blindly.
         if ($default === '' || ! $this->locales->hasLocale($default)) {
             return null;
         }

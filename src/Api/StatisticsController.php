@@ -17,12 +17,9 @@ use Psr\Http\Message\ServerRequestInterface;
 /**
  * `GET /api/language-detection/statistics?days=30`
  *
- * The whole dashboard in one response: the summary cards, the languages table, the countries table
- * and the trend. One request rather than four, so that every figure on the page comes from the same
- * instant and the same window -- four endpoints polled separately could straddle midnight, and the
- * cards would then disagree with the chart underneath them for reasons no admin could diagnose.
- *
- * @see Statistics::report() for the window arithmetic and for what `visitors` actually counts
+ * The whole dashboard in one response: the summary cards, the languages table, the countries table and
+ * the trend. One request rather than four, so every figure on the page comes from the same instant and
+ * the same window -- four endpoints polled separately could straddle midnight.
  */
 class StatisticsController extends AbstractController
 {

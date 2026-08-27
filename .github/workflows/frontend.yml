@@ -13,6 +13,14 @@ jobs:
       frontend_directory: ./js
       backend_directory: .
       js_package_manager: yarn
+      cache_dependency_path: ./js/yarn.lock
+
+      # The reusable workflow defaults to Node 16, which is long out of support. 20 is the
+      # current LTS and builds this webpack 5 / TypeScript 4 bundle unchanged.
+      node_version: 20
+
+      # Not cosmetic: `flarum/action-build` only commits the built `js/dist` bundle on a
+      # push to this branch, so a mismatch here means the shipped bundle is never rebuilt.
       main_git_branch: 1.x
     secrets:
       bundlewatch_github_token: ${{ secrets.BUNDLEWATCH_GITHUB_TOKEN }}

@@ -9,3 +9,8 @@ jobs:
       enable_backend_testing: true
 
       backend_directory: .
+
+      # The reusable workflow still defaults to a 7.3-8.2 matrix. This extension declares
+      # `php: ^8.0` in composer.json -- `str_contains()` and PHP 8's stable sort are both
+      # relied on -- so the matrix is the declared range and nothing outside it.
+      php_versions: '["8.0", "8.1", "8.2", "8.3"]'

@@ -28,9 +28,9 @@ use Mockery;
  * handed in carry no Mockery expectations at all, which makes that an assertion rather than a
  * convention: reach for the database from this half of `Statistics` and these tests fail.
  *
- * Named `StatisticsQueryTest` rather than `StatisticsTest` because `tests/integration` already has
- * a `StatisticsTest` -- Phase 6's counting tests. Two files of the same name would work, since
- * neither directory is autoloadable, but they would be a nuisance to grep for and to talk about.
+ * Named `StatisticsQueryTest` rather than `StatisticsTest` because `tests/integration` already has a
+ * `StatisticsTest`. Two files of the same name would work, since neither directory is autoloadable,
+ * but they would be a nuisance to grep for and to talk about.
  *
  * `ApiTest` covers the other half, where `SUM()`, `GROUP BY` and a date range actually run.
  */

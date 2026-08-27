@@ -97,8 +97,8 @@ class MissingLanguagesTest extends TestCase
     public function test_a_window_of_seven_days_reaches_back_six()
     {
         // The boundary, asserted from both sides. Seven days means today and the six before it,
-        // not today and the seven before it, because Phase 8 shows a seven-day total beside a
-        // seven-bar chart and the two have to be the same seven days.
+        // not today and the seven before it, because the dashboard shows a seven-day total beside
+        // a seven-bar chart and the two have to be the same seven days.
         $this->seed([
             [$this->daysAgo(6), 'ja', 10, 4],
             [$this->daysAgo(7), 'ja', 100, 40],

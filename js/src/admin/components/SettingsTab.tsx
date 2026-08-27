@@ -24,7 +24,7 @@ export interface SettingsTabAttrs extends ComponentAttrs {
  * The five settings, and the note about where IP country lookup gets its data.
  *
  * Nothing here reads or writes a setting directly: `buildSettingComponent()` binds each field to the
- * stream `AdminPage.setting()` owns, which is what `submitButton()` submits and `isChanged()` counts.
+ * stream `AdminPage.setting()` owns, which is what `submitButton()` submits.
  */
 export default class SettingsTab extends Component<SettingsTabAttrs> {
   /** True while the cleanup request is in flight, so the button cannot be pressed twice. */
@@ -93,10 +93,9 @@ export default class SettingsTab extends Component<SettingsTabAttrs> {
   /**
    * Deleting the old rows now, rather than waiting for the scheduled command.
    *
-   * Below the save button on purpose: it is not a setting, it takes effect immediately, and it
-   * cannot be undone. It also deletes by the *saved* retention period, not by whatever the select
-   * above is currently showing -- which is why the help text says so, and why an admin who changed
-   * the period has to save before this means what they think it means.
+   * Below the save button on purpose: it is not a setting, it takes effect immediately, and it cannot
+   * be undone. It deletes by the *saved* retention period, not by whatever the select above is
+   * showing, which is why the help text says so.
    */
   cleanup(): Mithril.Children {
     return (
@@ -112,8 +111,7 @@ export default class SettingsTab extends Component<SettingsTabAttrs> {
 
   /**
    * What the last run did, in the three outcomes `Api\CleanupController` distinguishes plus the
-   * failure. Retention being switched off is reported rather than shown as "nothing was deleted",
-   * because those two sentences would send an admin looking in different places.
+   * failure. Retention being switched off is reported rather than shown as "nothing was deleted".
    */
   outcomeMessage(): Mithril.Children {
     if (this.outcome === null) return null;
@@ -147,8 +145,8 @@ export default class SettingsTab extends Component<SettingsTabAttrs> {
         m.redraw();
       })
       .catch(() => {
-        // `app.request` has already reported the error; this is what takes the button out of its
-        // loading state and says, where the result would have been, that nothing was deleted.
+        // `app.request` has already reported the error; this takes the button out of its loading
+        // state and says, where the result would have been, that nothing was deleted.
         this.outcome = false;
         this.deleting = false;
         m.redraw();
@@ -158,9 +156,8 @@ export default class SettingsTab extends Component<SettingsTabAttrs> {
   /**
    * The installed language packs, with the forum default first.
    *
-   * `app.data.locales` is populated by core's own frontend payload on every frontend including this
-   * one, so there is no extender behind it. The code is shown alongside the name because two packs
-   * can carry the same title.
+   * `app.data.locales` is populated by core's own frontend payload, so there is no extender behind it.
+   * The code is shown alongside the name because two packs can carry the same title.
    */
   localeOptions(): Record<string, Mithril.Children> {
     const options: Record<string, Mithril.Children> = {

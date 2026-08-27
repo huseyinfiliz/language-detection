@@ -22,7 +22,7 @@
  *     php scripts/build-ip-data.php --source=DIR      build from files already downloaded
  *     php scripts/build-ip-data.php --out=DIR         write somewhere other than resources/
  *
- * Output format (HANDOFF.md §3; `IpCountryLookup` is the reader):
+ * Output format (`IpCountryLookup` is the reader):
  *
  *     ip4.dat    6-byte records: 4-byte big-endian range start + 2 ASCII country characters
  *     ip6.dat   10-byte records: 8-byte big-endian top half of the start + the same 2 chars
