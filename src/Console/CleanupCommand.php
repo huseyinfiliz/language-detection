@@ -12,16 +12,15 @@
 namespace HuseyinFiliz\LanguageDetection\Console;
 
 use Flarum\Console\AbstractCommand;
+use Flarum\Locale\LocaleManager;
 use HuseyinFiliz\LanguageDetection\Cleanup;
-use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * `php flarum language-detection:cleanup` -- and, through `Extend\Console`'s scheduler, the same
  * thing once a day without anybody typing it.
  *
- * The command owns no policy at all. It reads no setting, computes no cutoff and writes no query;
- * `Cleanup` does all three, and the admin page's button calls the same object. What is left here
- * is turning one of three outcomes into a line of output.
+ * The command owns no policy: `Cleanup` reads the setting, computes the cutoff and writes the
+ * query, and the admin page's button calls the same object.
  */
 class CleanupCommand extends AbstractCommand
 {
@@ -29,12 +28,32 @@ class CleanupCommand extends AbstractCommand
 
     protected Cleanup $cleanup;
 
-    protected TranslatorInterface $translator;
+    protected LocaleManager $locales;
 
-    public function __construct(Cleanup $cleanup, TranslatorInterface $translator)
+    /**
+     * `LocaleManager` rather than `TranslatorInterface`, and the difference is load-bearing.
+     *
+     * Symfony calls `configure()` from `Command::__construct()`, and this command is constructed on
+     * every HTTP request: `Extend\Console::schedule()` hands the class name to Laravel's scheduler,
+     * which resolves it from the container just to read the name and description. So `configure()`
+     * runs during application boot, before any middleware.
+     *
+     * Translations reach the shared translator only as a side effect of constructing
+     * `LocaleManager` -- core's own catalogue in its factory, every extension's and language pack's
+     * YAML in `resolving()` callbacks. Asking for the translator directly therefore yields one with
+     * no resources, and the first `trans()` compiles an empty catalogue for the forum's default
+     * locale and writes it to `storage/locale` with an empty resource list, which Symfony treats as
+     * permanently fresh. Every translation key on the forum then renders raw until that directory
+     * is cleared by hand.
+     *
+     * Injecting `LocaleManager` is what guarantees the resources are registered first. Extenders
+     * all run on the application's `booting` callback, before any service provider boots, so
+     * nothing is missing by the time the scheduler gets here.
+     */
+    public function __construct(Cleanup $cleanup, LocaleManager $locales)
     {
         $this->cleanup = $cleanup;
-        $this->translator = $translator;
+        $this->locales = $locales;
 
         parent::__construct();
     }
@@ -43,7 +62,7 @@ class CleanupCommand extends AbstractCommand
     {
         $this
             ->setName('language-detection:cleanup')
-            ->setDescription($this->translator->trans(self::KEY.'command_description'));
+            ->setDescription($this->trans('command_description'));
     }
 
     protected function fire()
@@ -53,24 +72,29 @@ class CleanupCommand extends AbstractCommand
         // Retention off is reported rather than passed over in silence: somebody who scheduled this
         // command and sees nothing happening is owed the reason.
         if ($result === null) {
-            $this->info($this->translator->trans(self::KEY.'retention_disabled'));
+            $this->info($this->trans('retention_disabled'));
 
             return 0;
         }
 
         if ($result['deleted'] === 0) {
-            $this->info($this->translator->trans(self::KEY.'nothing_to_delete'));
+            $this->info($this->trans('nothing_to_delete'));
 
             return 0;
         }
 
         // Braces included in the keys because Symfony's message formatter is a plain `strtr` over
         // the parameters, so `count` would not match `{count}` in the locale file.
-        $this->info($this->translator->trans(self::KEY.'deleted', [
+        $this->info($this->trans('deleted', [
             '{count}' => $result['deleted'],
             '{days}' => $result['days'],
         ]));
 
         return 0;
+    }
+
+    protected function trans(string $key, array $parameters = []): string
+    {
+        return $this->locales->getTranslator()->trans(self::KEY.$key, $parameters);
     }
 }
