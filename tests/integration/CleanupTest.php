@@ -42,7 +42,6 @@ class CleanupTest extends TestCase
         return [
             'id'                 => 2,
             'username'           => 'acme',
-            'nickname'           => null,
             'email'              => 'acme@example.com',
             'password'           => '',
             'is_email_confirmed' => 1,
