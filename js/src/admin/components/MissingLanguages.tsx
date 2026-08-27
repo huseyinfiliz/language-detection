@@ -10,12 +10,10 @@ export interface MissingLanguagesAttrs extends ComponentAttrs {
 }
 
 /**
- * The languages visitors asked for that this forum cannot show, and what would fix each one.
+ * The languages visitors asked for that this forum cannot show, with the package that would fix each.
  *
- * The rows come straight from `LanguageCatalog::missing()` -- this component decides nothing about
- * what belongs here. In particular a language is already rolled up by pack before it arrives, so
- * `de`, `de-DE` and `de-AT` are one suggestion and not three, and the tags that rolled up are shown
- * underneath rather than being dropped.
+ * Rows come straight from `LanguageCatalog::missing()` -- rolled up by pack before they arrive, so
+ * `de`, `de-DE` and `de-AT` are one suggestion, and the tags that rolled up are shown underneath.
  */
 export default class MissingLanguages extends Component<MissingLanguagesAttrs> {
   view() {
