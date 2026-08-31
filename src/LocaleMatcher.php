@@ -25,6 +25,10 @@ use Flarum\Locale\LocaleManager;
  * `default_locale` as a locale (English ships as core *translations*, not as a language pack), so on
  * a forum whose default is `tr`, `hasLocale('en')` is false. Applying the default locale is the
  * caller's job. The null is also the signal the missing-languages report is built on.
+ *
+ * One exception to "decline on ambiguity": see `AMBIGUOUS_MACROLANGUAGE_PREFERENCE`, which lets
+ * `zh`, `sr` and `no` resolve to a preferred variant when more than one is installed, rather than
+ * falling through to null.
  */
 class LocaleMatcher
 {
@@ -41,6 +45,29 @@ class LocaleMatcher
     ];
 
     /**
+     * Full language-region tags whose region unambiguously implies a script Flarum
+     * publishes a pack for.
+     *
+     * Browsers send region variants (`zh-CN`, `zh-TW`) rather than the script subtags Flarum
+     * actually publishes packs under (`zh-Hans`, `zh-Hant`). Without this, `zh-CN` falls through
+     * to tier 3's sibling check, finds *both* `zh-Hans` and `zh-Hant` installed under the `zh`
+     * base, and is declined as ambiguous -- even though the region already answers the question.
+     * Unlike `CODE_ALIASES`, this maps the whole tag rather than just the language subtag, and is
+     * checked before subtag splitting so the match happens at tier 1 instead of tier 3.
+     *
+     * A bare `zh` (no region) is deliberately left out: with no region to disambiguate, falling
+     * through to tier 3 and declining when both scripts are installed is the correct behaviour,
+     * the same as it is for `sr` (Cyrillic vs Latin) and `no` (Bokmål vs Nynorsk).
+     */
+    const REGION_SCRIPT_ALIASES = [
+        'zh-cn' => 'zh-hans',
+        'zh-sg' => 'zh-hans',
+        'zh-tw' => 'zh-hant',
+        'zh-hk' => 'zh-hant',
+        'zh-mo' => 'zh-hant',
+    ];
+
+    /**
      * Macrolanguages mapped to the concrete codes Flarum publishes packs for.
      *
      * These feed tier 3's existing "exactly one installed" rule rather than adding a mechanism:
@@ -51,6 +78,28 @@ class LocaleMatcher
     const MACROLANGUAGES = [
         'no' => ['nb', 'nn'],
         'ku' => ['ckb', 'kmr'],
+    ];
+
+    /**
+     * Macrolanguages where, unlike a plain decline, an installed-but-still-ambiguous case (more
+     * than one variant present) should resolve to a preferred variant rather than being declined.
+     *
+     * All three entries have a genuinely more common variant, so guessing it beats falling through
+     * to the caller's default_locale, which is very often not even the same language:
+     *   - `zh`: Simplified (mainland China, Singapore) is read by far more people than Traditional,
+     *     and the two are close enough (same grammar, mostly overlapping characters) that a wrong
+     *     guess is mild.
+     *   - `sr`: Latin (Latinica) dominates everyday digital use even though Cyrillic (Ćirilica) is
+     *     the official script.
+     *   - `no`: Bokmål is used by roughly 85-90% of Norwegians; Nynorsk is a minority standard.
+     * A wrong guess still costs more here than for `zh` -- Cyrillic/Latin and Bokmål/Nynorsk are
+     * more distinct than the two Chinese scripts -- but landing visitors on the wrong flavour of
+     * a language they do read beats landing them on a language they don't read at all.
+     */
+    const AMBIGUOUS_MACROLANGUAGE_PREFERENCE = [
+        'zh' => 'zh-hans',
+        'sr' => 'sr-latn',
+        'no' => 'nb',
     ];
 
     protected LocaleManager $locales;
@@ -98,7 +147,7 @@ class LocaleMatcher
             $subtags = explode('-', $normalized);
 
             // 1. Exact match. `es-MX` returns `es_MX`, underscore and all; `zh-hans`
-            //    returns `zh-Hans`.
+            //    returns `zh-Hans`; `zh-CN` normalises to `zh-hans` and returns `zh-Hans` too.
             if (isset($installed[$normalized])) {
                 return $installed[$normalized];
             }
@@ -156,7 +205,23 @@ class LocaleMatcher
             }
         }
 
-        return count($matches) === 1 ? reset($matches) : null;
+        if (count($matches) === 1) {
+            return reset($matches);
+        }
+
+        // More than one variant installed: normally an unresolvable ambiguity (see the class
+        // docblock's `sr` example). For the small set of macrolanguages in
+        // `AMBIGUOUS_MACROLANGUAGE_PREFERENCE`, a wrong guess is cheap enough that picking the
+        // preferred variant beats falling through to the caller's default_locale.
+        if (count($matches) > 1 && isset(self::AMBIGUOUS_MACROLANGUAGE_PREFERENCE[$base])) {
+            $preferred = self::AMBIGUOUS_MACROLANGUAGE_PREFERENCE[$base];
+
+            if (isset($matches[$preferred])) {
+                return $matches[$preferred];
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -187,8 +252,9 @@ class LocaleMatcher
      * Fold a code into a form safe to compare -- never to output.
      *
      * Case- and separator-insensitive, so `TR`, `tr` and `es_MX` all compare as a client would mean
-     * them. `CODE_ALIASES` is applied to the language subtag, which covers a requested `uzb-UZ` as
-     * well as a bare `uzb`.
+     * them. `REGION_SCRIPT_ALIASES` is checked first, against the full tag, so a full match (like
+     * `zh-cn`) is caught before subtag splitting. `CODE_ALIASES` is then applied to the language
+     * subtag, which covers a requested `uzb-UZ` as well as a bare `uzb`.
      */
     protected function normalize(string $code): string
     {
@@ -196,6 +262,10 @@ class LocaleMatcher
 
         if ($code === '') {
             return '';
+        }
+
+        if (isset(self::REGION_SCRIPT_ALIASES[$code])) {
+            return self::REGION_SCRIPT_ALIASES[$code];
         }
 
         $subtags = explode('-', $code);
