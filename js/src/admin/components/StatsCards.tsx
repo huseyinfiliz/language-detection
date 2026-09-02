@@ -84,8 +84,7 @@ export default class StatsCards extends Component<StatsCardsAttrs> {
       </>
     );
 
-    const className =
-      'LanguageDetection-card LanguageDetection-card--' + card.field + (clickable ? ' LanguageDetection-card--clickable' : '');
+    const className = 'LanguageDetection-card LanguageDetection-card--' + card.field + (clickable ? ' LanguageDetection-card--clickable' : '');
 
     if (!clickable) {
       return <div className={className}>{body}</div>;

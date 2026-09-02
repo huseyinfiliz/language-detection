@@ -3,14 +3,14 @@ import Component from 'flarum/common/Component';
 import type { ComponentAttrs } from 'flarum/common/Component';
 import type { Summary } from '../types';
 export interface StatsCardsAttrs extends ComponentAttrs {
-    summary: Summary;
+  summary: Summary;
 }
 interface CardSpec {
-    field: keyof Summary;
-    label: string;
-    help: string;
-    /** Whether this figure is a slice of the page-view total, and so worth a percentage. */
-    share: boolean;
+  field: keyof Summary;
+  label: string;
+  help: string;
+  /** Whether this figure is a slice of the page-view total, and so worth a percentage. */
+  share: boolean;
 }
 /**
  * The summary, one card per figure.
@@ -21,7 +21,7 @@ interface CardSpec {
  * it is not once you are four cards along.
  */
 export default class StatsCards extends Component<StatsCardsAttrs> {
-    view(): JSX.Element;
-    card(card: CardSpec, summary: Summary): Mithril.Children;
+  view(): JSX.Element;
+  card(card: CardSpec, summary: Summary): Mithril.Children;
 }
 export {};

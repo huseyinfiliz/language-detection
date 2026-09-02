@@ -3,7 +3,7 @@ import Component from 'flarum/common/Component';
 import type { ComponentAttrs } from 'flarum/common/Component';
 import type { LanguageRow } from '../types';
 export interface LanguagesTableAttrs extends ComponentAttrs {
-    languages: LanguageRow[];
+  languages: LanguageRow[];
 }
 /**
  * Every language visitors asked for, busiest first.
@@ -14,12 +14,12 @@ export interface LanguagesTableAttrs extends ComponentAttrs {
  * visitor who asked for nothing was not failed.
  */
 export default class LanguagesTable extends Component<LanguagesTableAttrs> {
-    view(): JSX.Element;
-    table(languages: LanguageRow[]): Mithril.Children;
-    row(row: LanguageRow): Mithril.Children;
-    /**
-     * Served, not served, or nothing at all -- the three states the API distinguishes.
-     */
-    status(served: boolean | null): Mithril.Children;
-    empty(): Mithril.Children;
+  view(): JSX.Element;
+  table(languages: LanguageRow[]): Mithril.Children;
+  row(row: LanguageRow): Mithril.Children;
+  /**
+   * Served, not served, or nothing at all -- the three states the API distinguishes.
+   */
+  status(served: boolean | null): Mithril.Children;
+  empty(): Mithril.Children;
 }

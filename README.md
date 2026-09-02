@@ -4,20 +4,20 @@ A [Flarum](https://flarum.org) extension that automatically detects a visitor's 
 
 ## Features
 
-* **Browser language detection** — Uses the visitor's browser language preferences to determine their preferred locale.
-* **IP-based country detection** — Detects the visitor's country locally using bundled IP range data, with support for IPv4 and IPv6.
-* **Automatic locale selection** — Combines browser language and country information to select the best available Flarum language.
-* **Country-to-language mapping** — Configure which languages should be preferred for specific countries.
-* **Smart language matching** — Handles locale variants and ambiguous language codes such as `zh`, `sr`, `no`, and `ku`.
-* **Native Flarum integration** — Resolves the locale before Flarum's `SetLocale` middleware instead of switching the language after the page has loaded.
-* **Visitor statistics** — Optionally collect statistics about visitor countries and language requests.
-* **Missing language tracking** — See which languages visitors request that are not currently installed.
-* **Configurable fallback** — Define how the extension should behave when no suitable language can be detected.
+- **Browser language detection** — Uses the visitor's browser language preferences to determine their preferred locale.
+- **IP-based country detection** — Detects the visitor's country locally using bundled IP range data, with support for IPv4 and IPv6.
+- **Automatic locale selection** — Combines browser language and country information to select the best available Flarum language.
+- **Country-to-language mapping** — Configure which languages should be preferred for specific countries.
+- **Smart language matching** — Handles locale variants and ambiguous language codes such as `zh`, `sr`, `no`, and `ku`.
+- **Native Flarum integration** — Resolves the locale before Flarum's `SetLocale` middleware instead of switching the language after the page has loaded.
+- **Visitor statistics** — Optionally collect statistics about visitor countries and language requests.
+- **Missing language tracking** — See which languages visitors request that are not currently installed.
+- **Configurable fallback** — Define how the extension should behave when no suitable language can be detected.
 
 ## Requirements
 
-* Flarum `1.x`
-* A Flarum language pack for each locale you want to serve
+- Flarum `1.x`
+- A Flarum language pack for each locale you want to serve
 
 ## Installation
 
@@ -31,11 +31,11 @@ Then enable **Language Detection** from the Flarum administration panel.
 
 The extension provides settings for:
 
-* Detection behavior and priority
-* Country-to-language mappings
-* Fallback locale
-* Visitor and language statistics
-* Missing language tracking
+- Detection behavior and priority
+- Country-to-language mappings
+- Fallback locale
+- Visitor and language statistics
+- Missing language tracking
 
 ## Privacy
 
@@ -51,10 +51,10 @@ Community translations are welcome.
 
 ## Links
 
-* [Discuss](https://discuss.flarum.org/d/39779-language-detection-auto-switching-by-ip-system)
-* [Packagist](https://packagist.org/packages/huseyinfiliz/language-detection)
-* [GitHub](https://github.com/huseyinfiliz/language-detection)
-* [Issues](https://github.com/huseyinfiliz/language-detection/issues)
+- [Discuss](https://discuss.flarum.org/d/39779-language-detection-auto-switching-by-ip-system)
+- [Packagist](https://packagist.org/packages/huseyinfiliz/language-detection)
+- [GitHub](https://github.com/huseyinfiliz/language-detection)
+- [Issues](https://github.com/huseyinfiliz/language-detection/issues)
 
 ## License
 
