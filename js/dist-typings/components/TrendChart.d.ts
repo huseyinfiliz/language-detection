@@ -3,7 +3,7 @@ import Component from 'flarum/common/Component';
 import type { ComponentAttrs } from 'flarum/common/Component';
 import type { TrendPoint } from '../types';
 export interface TrendChartAttrs extends ComponentAttrs {
-  trend: TrendPoint[];
+    trend: TrendPoint[];
 }
 /**
  * Page views per day, as hand-written inline SVG.
@@ -20,10 +20,10 @@ export interface TrendChartAttrs extends ComponentAttrs {
  * so, rather than dividing by a maximum of zero. See `scale()`.
  */
 export default class TrendChart extends Component<TrendChartAttrs> {
-  view(): JSX.Element;
-  chart(points: TrendPoint[]): Mithril.Children;
-  /**
-   * A day: a faint full-height track so that quiet days are still visible, and the bar itself.
-   */
-  column(point: TrendPoint, index: number, max: number): Mithril.Children;
+    view(): JSX.Element;
+    chart(points: TrendPoint[]): Mithril.Children;
+    /**
+     * A day: a faint full-height track so that quiet days are still visible, and the bar itself.
+     */
+    column(point: TrendPoint, index: number, max: number): Mithril.Children;
 }

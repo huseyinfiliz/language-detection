@@ -1,5 +1,5 @@
 /// <reference types="flarum/@types/translator-icu-rich" />
-export declare function trans(key: string, parameters?: Record<string, unknown>): import('@askvortsov/rich-icu-message-formatter').NestedStringArray;
+export declare function trans(key: string, parameters?: Record<string, unknown>): import("@askvortsov/rich-icu-message-formatter").NestedStringArray;
 /**
  * A country's name in the administrator's own language, falling back to its code.
  *
@@ -13,7 +13,7 @@ export declare function countryName(code: string): string;
  * browser stated no preference, often the biggest row on the page; a null `name` is a tag no bundled
  * language pack answers. Neither may render as an empty cell, and neither may borrow the other's label.
  */
-export declare function languageLabel(locale: string, name: string | null): import('@askvortsov/rich-icu-message-formatter').NestedStringArray;
+export declare function languageLabel(locale: string, name: string | null): import("@askvortsov/rich-icu-message-formatter").NestedStringArray;
 /**
  * A count, grouped for readability in the administrator's own language.
  */

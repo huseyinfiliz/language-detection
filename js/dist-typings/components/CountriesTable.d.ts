@@ -3,7 +3,7 @@ import Component from 'flarum/common/Component';
 import type { ComponentAttrs } from 'flarum/common/Component';
 import type { CountryRow } from '../types';
 export interface CountriesTableAttrs extends ComponentAttrs {
-  countries: CountryRow[];
+    countries: CountryRow[];
 }
 /**
  * Where visitors came from, busiest first.
@@ -13,8 +13,8 @@ export interface CountriesTableAttrs extends ComponentAttrs {
  * or edge headers are not doing what its admin thinks they are, and that is worth being able to see.
  */
 export default class CountriesTable extends Component<CountriesTableAttrs> {
-  view(): JSX.Element;
-  table(countries: CountryRow[]): Mithril.Children;
-  row(row: CountryRow): Mithril.Children;
-  empty(): Mithril.Children;
+    view(): JSX.Element;
+    table(countries: CountryRow[]): Mithril.Children;
+    row(row: CountryRow): Mithril.Children;
+    empty(): Mithril.Children;
 }
