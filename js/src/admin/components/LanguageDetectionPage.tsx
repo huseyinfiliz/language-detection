@@ -115,7 +115,7 @@ export default class LanguageDetectionPage extends ExtensionPage<ExtensionPageAt
       default:
         return [
           this.analyticsNotice(),
-          <StatsCards summary={statistics.summary} onSelect={(tab) => this.selectTab(tab)} />,
+          <StatsCards summary={statistics.summary} onSelect={(tab: Tab) => this.selectTab(tab)} />,
           <TrendChart trend={statistics.trend} />,
         ];
     }
@@ -197,7 +197,14 @@ export default class LanguageDetectionPage extends ExtensionPage<ExtensionPageAt
     );
   }
 
-
+  /**
+   * How many rows a tab holds, for the count pill beside its name. Null while nothing is loaded, and
+   * for the two tabs that are not a list of anything.
+   *
+   * `languages` excludes the `''` row the same way `LanguagesTable` does: that row is filtered from
+   * the table itself (see `LanguagesTable`'s docblock), and a badge reading 20 beside a table showing
+   * 19 rows would look like a bug rather than the deliberate omission it is.
+   */
   badge(tab: Tab): number | null {
     if (this.statistics === null || this.missing === null) return null;
 
