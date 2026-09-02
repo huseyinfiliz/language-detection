@@ -33,7 +33,14 @@ export interface Summary {
 }
 
 export interface LanguageRow {
-  /** `''` is the "no preference stated" row, and it is real traffic rather than a blank. */
+  /**
+   * `''` is the "no preference stated" row, and it is real traffic rather than a blank. Every other
+   * value is the *resolved* locale that answers the row -- the installed pack's own spelling when
+   * served, or the catalog key that would serve it otherwise -- not necessarily a tag any single
+   * visitor typed. `Statistics::languagesFrom()` groups spelling variants (`tr-TR`, `TR` onto `tr`;
+   * `zh-CN` onto `zh-Hans`) onto one row rather than showing the same language as several, and `tags`
+   * is where the raw variants that were merged are still visible.
+   */
   locale: string;
   name: string | null;
   native: string | null;
@@ -41,6 +48,11 @@ export interface LanguageRow {
   served: boolean | null;
   requests: number;
   visitors: number;
+  /**
+   * Every raw tag that rolled up into this row, sorted -- e.g. `['tr', 'tr-TR']`. Length 1 for a row
+   * with no variants to show; the `''` row's single entry is `['']`.
+   */
+  tags: string[];
 }
 
 export interface CountryRow {

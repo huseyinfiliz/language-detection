@@ -48,8 +48,16 @@ export default class CountriesTable extends Component<CountriesTableAttrs> {
           <strong>{row.country === '' ? trans('dashboard.countries_unknown') : countryName(row.country)}</strong>
           {row.country === '' ? null : <code className="LanguageDetection-code">{row.country}</code>}
         </span>
-        <span className="CardList-number">{count(row.requests)}</span>
-        <span className="CardList-number">{count(row.visitors)}</span>
+        {/*
+          `data-label` mirrors the header text so the mobile stylesheet can prefix each value with
+          the column it belongs to once the header row itself is hidden below the breakpoint.
+        */}
+        <span className="CardList-number" data-label={trans('dashboard.countries_column_requests')}>
+          {count(row.requests)}
+        </span>
+        <span className="CardList-number" data-label={trans('dashboard.countries_column_visitors')}>
+          {count(row.visitors)}
+        </span>
       </div>
     );
   }

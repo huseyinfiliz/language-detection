@@ -113,7 +113,11 @@ export default class LanguageDetectionPage extends ExtensionPage<ExtensionPageAt
         return <CountriesTable countries={statistics.countries} />;
 
       default:
-        return [this.analyticsNotice(), <StatsCards summary={statistics.summary} />, <TrendChart trend={statistics.trend} />];
+        return [
+          this.analyticsNotice(),
+          <StatsCards summary={statistics.summary} onSelect={(tab) => this.selectTab(tab)} />,
+          <TrendChart trend={statistics.trend} />,
+        ];
     }
   }
 
@@ -146,6 +150,12 @@ export default class LanguageDetectionPage extends ExtensionPage<ExtensionPageAt
       });
   }
 
+  /**
+   * Switches which window (7/30/90 days) every figure on the page is drawn from, re-fetching both
+   * endpoints. Named apart from `selectTab()` because the two are unrelated axes -- a window change
+   * re-fetches, a tab change does not -- and folding them into one overloaded `select()` was what
+   * made the overview cards unable to just call "select a tab" without also risking a re-fetch.
+   */
   select(days: number) {
     if (days === this.days) return;
 
@@ -153,17 +163,20 @@ export default class LanguageDetectionPage extends ExtensionPage<ExtensionPageAt
     this.refresh();
   }
 
+  /**
+   * Switches which tab is open. Shared by `tabButton()` and by `StatsCards`'s clickable summary
+   * cards, so a card click and a tab click behave identically -- including the count pill on the
+   * tab immediately reflecting where the click landed.
+   */
+  selectTab(tab: Tab) {
+    this.tab = tab;
+  }
+
   tabButton(tab: TabSpec): Mithril.Children {
     const badge = this.badge(tab.id);
 
     return (
-      <Button
-        className={'Button' + (this.tab === tab.id ? ' active' : '')}
-        icon={tab.icon}
-        onclick={() => {
-          this.tab = tab.id;
-        }}
-      >
+      <Button className={'Button' + (this.tab === tab.id ? ' active' : '')} icon={tab.icon} onclick={() => this.selectTab(tab.id)}>
         {trans(tab.label)}
         {badge === null ? null : <span className="Button-badge">{badge}</span>}
       </Button>
@@ -184,14 +197,11 @@ export default class LanguageDetectionPage extends ExtensionPage<ExtensionPageAt
     );
   }
 
-  /**
-   * How many rows a tab holds, for the count pill beside its name. Null while nothing is loaded, and
-   * for the two tabs that are not a list of anything.
-   */
+
   badge(tab: Tab): number | null {
     if (this.statistics === null || this.missing === null) return null;
 
-    if (tab === 'languages') return this.statistics.languages.length;
+    if (tab === 'languages') return this.statistics.languages.filter((row) => row.locale !== '').length;
     if (tab === 'missing') return this.missing.missing.length;
     if (tab === 'countries') return this.statistics.countries.length;
 

@@ -190,7 +190,12 @@ class LanguageCatalog
      *
      * Null therefore covers two situations, both reported rather than dropped: a language Flarum has
      * no pack for (`sw`, `zu`), and a macrolanguage with more than one candidate pack (`no`, `ku`,
-     * `sr`, `zh`). Demand nobody can act on is precisely the demand an admin most needs to see.
+     * `sr`, `zh`) *requested with no region to disambiguate it*. Demand nobody can act on is precisely
+     * the demand an admin most needs to see.
+     *
+     * A region that does disambiguate (`zh-CN`, `zh-TW`) is resolved by `fold()`'s
+     * `REGION_SCRIPT_ALIASES` step before this runs, so it reaches the exact-match tier directly and
+     * never falls into that second case.
      *
      * A *served* macrolanguage never reaches here: `LocaleMatcher` resolves `no` to `nb` when Bokmål
      * alone is installed, so `missingFrom()` has already filtered it out.
@@ -206,7 +211,7 @@ class LanguageCatalog
         $index = $this->index();
 
         // 1. Exact match. With both sides folded the same way, this is what resolves `pt-br` to
-        //    `pt-BR`, `es-ar` to `es_AR` and `uz` to `uzb`.
+        //    `pt-BR`, `es-ar` to `es_AR`, `uz` to `uzb`, and `zh-cn` to `zh-Hans`.
         if (isset($index[$folded])) {
             return $index[$folded];
         }
@@ -272,9 +277,18 @@ class LanguageCatalog
     /**
      * Fold a code into a form safe to compare -- never to output.
      *
-     * The same three lines as `LocaleMatcher::normalize()`, repeated rather than shared for the same
+     * The same lines as `LocaleMatcher::normalize()`, repeated rather than shared for the same
      * reason `Analytics` repeats them: what is compared here is a requested tag against a *published
      * catalog*, not against a forum's installed locales.
+     *
+     * `REGION_SCRIPT_ALIASES` is checked first, against the full tag -- exactly as in
+     * `LocaleMatcher::normalize()` -- so a region that implies a script (`zh-CN`, `zh-TW`) is folded
+     * to that script's catalog key before subtag splitting. Skipping this step was the bug behind an
+     * admin-visible "unrecognised language tag" for `zh-cn`: `LocaleMatcher::match()` already applied
+     * this alias and correctly reported the tag as served, while this method, missing the same alias,
+     * folded `zh-cn` to itself, found no catalog entry, and returned null -- so `missingFrom()` (and
+     * any caller using `entryFor()` to label an already-served tag) showed no name for a tag the
+     * forum was, in fact, serving.
      *
      * `CODE_ALIASES` is read rather than copied, and mind its direction -- it maps catalog key to the
      * code a browser sends (`uzb` => `uz`), so applying it to both sides files catalog `uzb` under
@@ -286,6 +300,10 @@ class LanguageCatalog
 
         if ($code === '') {
             return '';
+        }
+
+        if (isset(LocaleMatcher::REGION_SCRIPT_ALIASES[$code])) {
+            return LocaleMatcher::REGION_SCRIPT_ALIASES[$code];
         }
 
         $subtags = explode('-', $code);

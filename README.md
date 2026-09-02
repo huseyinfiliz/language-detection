@@ -51,7 +51,7 @@ Community translations are welcome.
 
 ## Links
 
-* [Discuss](https://discuss.flarum.org/)
+* [Discuss](https://discuss.flarum.org/d/39779-language-detection-auto-switching-by-ip-system)
 * [Packagist](https://packagist.org/packages/huseyinfiliz/language-detection)
 * [GitHub](https://github.com/huseyinfiliz/language-detection)
 * [Issues](https://github.com/huseyinfiliz/language-detection/issues)

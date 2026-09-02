@@ -51,9 +51,17 @@ export default class MissingLanguages extends Component<MissingLanguagesAttrs> {
           <code className="LanguageDetection-code">{row.locale}</code>
           {this.variants(row.tags)}
         </span>
-        <span className="CardList-number">{count(row.requests)}</span>
-        <span className="CardList-number">{count(row.visitors)}</span>
-        <span>{this.pack(row.package)}</span>
+        {/*
+          `data-label` mirrors the header text so the mobile stylesheet can prefix each value with
+          the column it belongs to once the header row itself is hidden below the breakpoint.
+        */}
+        <span className="CardList-number" data-label={trans('dashboard.missing_column_requests')}>
+          {count(row.requests)}
+        </span>
+        <span className="CardList-number" data-label={trans('dashboard.missing_column_visitors')}>
+          {count(row.visitors)}
+        </span>
+        <span data-label={trans('dashboard.missing_column_package')}>{this.pack(row.package)}</span>
       </div>
     );
   }

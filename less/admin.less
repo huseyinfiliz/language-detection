@@ -116,6 +116,30 @@
     padding: 16px;
   }
 
+  // Cards backed by a tab (languages, countries, served, unserved) render as real `<button>`
+  // elements so they are reachable and operable by keyboard, not just a mouse. This undoes the
+  // browser's default button chrome so they still read as the same kind of card as the plain,
+  // unclickable ones beside them (requests, visitors, unstated), plus a hover/focus cue that tells
+  // an admin which cards actually go somewhere.
+  .LanguageDetection-card--clickable {
+    display: block;
+    width: 100%;
+    border: 1px solid var(--control-bg, @control-bg);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition:
+      box-shadow 0.15s ease,
+      border-color 0.15s ease;
+
+    &:hover,
+    &:focus {
+      border-color: var(--primary-color, @primary-color);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      outline: none;
+    }
+  }
+
   .LanguageDetection-card-value {
     color: var(--heading-color, @heading-color);
     font-size: 24px;
@@ -347,8 +371,34 @@
       padding: 12px;
     }
 
+    // A bare "132" stacked under a bare "47" is meaningless once the header that named those
+    // columns is gone. Each cell becomes its own labelled line instead: `data-label`, set by the
+    // table components from the same trans keys the header uses, is rendered before the value so
+    // the two can never drift out of sync with each other.
+    .CardList-row > [data-label] {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+
+      &::before {
+        content: attr(data-label);
+        color: var(--muted-color, @muted-color);
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+    }
+
     .CardList-number {
       text-align: left;
+    }
+
+    // The name cell has no `data-label` -- it's the row's own heading, not one more field -- so it
+    // keeps wrapping onto its own line rather than being forced into the label/value row above.
+    .LanguageDetection-name {
+      display: block;
     }
   }
 }

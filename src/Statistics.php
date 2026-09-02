@@ -23,7 +23,9 @@ use Illuminate\Database\ConnectionInterface;
  * **The summary is derived from the rows the tables render, not queried separately.** `report()`
  * fetches the grouped languages and countries once and hands them to `summaryFrom()`, so a card that
  * disagrees with the table below it cannot happen. It also makes the distinct-language count the
- * number of table rows rather than a `COUNT(DISTINCT locale)`, which would count `''` as a language.
+ * number of table rows rather than a `COUNT(DISTINCT locale)`, which would count `''` as a language
+ * -- and, since `languagesFrom()` now groups spelling variants of the same served language onto one
+ * row, would also have overcounted a language requested under several tags.
  *
  * **`''` is a third case, not an unserved one.** A row with an empty locale is a visitor whose
  * `Accept-Language` said nothing usable, and on most forums it is the largest bucket in the table. It
@@ -186,32 +188,80 @@ class Statistics
      * middleware made when the request came in, so this column reports what visitors actually got
      * rather than a second opinion about it.
      *
+     * Grouped by *resolved* locale, not by the raw tag the database stored. `Analytics` records the
+     * exact tag a browser sent, so `tr` and `tr-TR` and `TR` are three different rows in the database
+     * -- and, more visibly, so are `zh-CN` and `zh-Hans`, which resolve to the very same installed
+     * pack. Without this grouping, one language would show up as several rows with the same name,
+     * each with a fraction of its real traffic, and the same language could appear once as "Served"
+     * and once as "Not served" purely because of which spelling happened to be requested. The grouping
+     * key is:
+     *
+     *   - the empty string, kept apart from every other tag: "no preference stated" is a case of its
+     *     own (see the class docblock), never merged with a named language;
+     *   - the installed locale's own spelling, when `LocaleMatcher` resolves the tag to one -- this is
+     *     what makes `tr-TR` and `TR` collapse onto the same row as `tr`, and `zh-CN` onto `zh-Hans`;
+     *   - otherwise, the catalog key that *would* serve the tag if a matching pack were installed, via
+     *     `LanguageCatalog::keyFor()` -- the same rule `missingFrom()` uses, so an unserved language
+     *     rolls up here exactly as it does on the Missing tab;
+     *   - failing both, the raw tag itself, for a tag that names nothing this catalog recognises.
+     *
+     * `tags` on each row lists every raw spelling that rolled up into it, so nothing requested is
+     * hidden -- it is just no longer spread across duplicate rows.
+     *
      * @param array<string, array{requests: int, visitors: int}> $volumes requested tag => totals
      *
      * @return array<int, array<string, mixed>>
      */
     public function languagesFrom(array $volumes): array
     {
-        $languages = [];
+        $groups = [];
 
         foreach ($volumes as $tag => $volume) {
             $tag = (string) $tag;
 
-            // `entryFor()` would return null for `''` anyway; short-circuiting says out loud that
-            // "no preference stated" is not a language whose display name went missing.
-            $entry = $tag === '' ? null : $this->catalog->entryFor($tag);
+            if ($tag === '') {
+                $key = '';
+                $served = null;
+                $entry = null;
+            } else {
+                $installed = $this->matcher->match([$tag]);
+                $served = $installed !== null;
 
-            $languages[] = [
-                'locale'   => $tag,
-                'name'     => $entry['name'] ?? null,
-                'native'   => $entry['native'] ?? null,
-                'served'   => $tag === '' ? null : $this->matcher->match([$tag]) !== null,
-                'requests' => (int) ($volume['requests'] ?? 0),
-                'visitors' => (int) ($volume['visitors'] ?? 0),
-            ];
+                // Prefer the installed spelling as the group key when served, so every variant of a
+                // served language collapses onto the row for the pack that actually answered it.
+                // Fall back to the catalog's own key, then to the raw tag, when nothing is installed.
+                $key = $installed ?? ($this->catalog->keyFor($tag) ?? $tag);
+
+                // The catalog is keyed by its own canonical spelling, so look up by that first; if
+                // the group key came from `LocaleMatcher` and happens not to be a catalog key at all
+                // (an installed locale outside the official catalog), fall back to the raw tag.
+                $entry = $this->catalog->entryFor($key) ?? $this->catalog->entryFor($tag);
+            }
+
+            if (! isset($groups[$key])) {
+                $groups[$key] = [
+                    'locale'   => $key,
+                    'name'     => $entry['name'] ?? null,
+                    'native'   => $entry['native'] ?? null,
+                    'served'   => $served,
+                    'requests' => 0,
+                    'visitors' => 0,
+                    'tags'     => [],
+                ];
+            }
+
+            $groups[$key]['requests'] += (int) ($volume['requests'] ?? 0);
+            $groups[$key]['visitors'] += (int) ($volume['visitors'] ?? 0);
+            $groups[$key]['tags'][] = $tag;
         }
 
-        return $this->ordered($languages, 'locale');
+        foreach ($groups as &$group) {
+            sort($group['tags']);
+        }
+
+        unset($group);
+
+        return $this->ordered(array_values($groups), 'locale');
     }
 
     /**
