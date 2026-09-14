@@ -384,7 +384,7 @@ class Statistics
         $volumes = [];
 
         foreach ($rows as $row) {
-            $volumes[(string) $row->$column] = [
+            $volumes[trim((string) $row->$column)] = [
                 'requests' => (int) $row->requests,
                 'visitors' => (int) $row->visitors,
             ];

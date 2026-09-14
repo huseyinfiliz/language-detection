@@ -28,7 +28,7 @@ return Migration::createTable(
         // unique index, so a nullable column would let every request without a resolved
         // country insert a fresh row instead of incrementing the existing one, and the
         // atomic upsert below would never dedupe. '' means "unknown".
-        $table->char('country_code', 2)->default('');
+        $table->string('country_code', 2)->default('');
 
         $table->unsignedInteger('requests')->default(0);
         $table->unsignedInteger('unique_visitors')->default(0);
