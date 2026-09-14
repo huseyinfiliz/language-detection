@@ -15,7 +15,7 @@ import app from 'flarum/admin/app';
 const PREFIX = 'huseyinfiliz-language-detection.admin.';
 
 export function trans(key: string, parameters?: Record<string, unknown>) {
-  return app.translator.trans(PREFIX + key, parameters);
+  return parameters ? app.translator.trans(PREFIX + key, parameters) : app.translator.trans(PREFIX + key);
 }
 
 /**

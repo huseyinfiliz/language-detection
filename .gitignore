@@ -5,6 +5,8 @@ composer.phar
 .DS_Store
 Thumbs.db
 tests/.phpunit.result.cache
+tests/.phpunit.cache
+.phpunit.cache
 /tests/integration/tmp
 .vagrant
 .idea/*

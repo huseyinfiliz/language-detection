@@ -45,14 +45,14 @@ class CleanupCommand extends AbstractCommand
         parent::__construct();
     }
 
-    protected function configure()
+    protected function configure(): void
     {
         $this
             ->setName('language-detection:cleanup')
             ->setDescription($this->trans('command_description'));
     }
 
-    protected function fire()
+    protected function fire(): int
     {
         $result = $this->cleanup->run();
 

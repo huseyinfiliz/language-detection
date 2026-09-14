@@ -251,19 +251,19 @@ class SettingsStub implements SettingsRepositoryInterface
         return $this->settings;
     }
 
-    public function get($key, $default = null)
+    public function get(string $key, mixed $default = null): mixed
     {
         // An unset setting reads as null, the same as it would before the extension's
         // defaults are written -- which is a state a real forum passes through.
         return $this->settings[$key] ?? $default;
     }
 
-    public function set($key, $value)
+    public function set(string $key, mixed $value): void
     {
         $this->settings[$key] = $value;
     }
 
-    public function delete($keyLike)
+    public function delete(string $keyLike): void
     {
         unset($this->settings[$keyLike]);
     }

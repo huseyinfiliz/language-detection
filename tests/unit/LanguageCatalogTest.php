@@ -152,18 +152,21 @@ class LanguageCatalogTest extends TestCase
         $this->assertNull($report[0]['package']);
     }
 
-    public function test_a_region_that_implies_a_script_is_not_guessed()
+    public function test_a_region_that_implies_a_script_is_resolved()
     {
-        // Pinned rather than endorsed. `zh-cn` means Simplified Chinese to any reader, but
-        // mapping region to script would need a table this extension does not have, and
-        // `LocaleMatcher` declines the same guess at detection time (`['zh-CN']` matches nothing
-        // even with `zh-Hans` installed). Guessing here alone would be worse than not guessing:
-        // an admin would install the pack this report named and those visitors would *still* not
-        // be served Chinese, because detection would go on declining. Fixing it means fixing the
-        // matcher, which is a decision for a later phase and is recorded as such.
+        // Via REGION_SCRIPT_ALIASES, `zh-cn` resolves to `zh-Hans` with package `flarum-lang/chinese-simplified`.
         $report = $this->report(['tr'], ['zh-cn' => [12, 6]]);
 
-        $this->assertSame('zh-cn', $report[0]['locale']);
+        $this->assertSame('zh-Hans', $report[0]['locale']);
+        $this->assertSame('flarum-lang/chinese-simplified', $report[0]['package']);
+    }
+
+    public function test_an_ambiguous_macrolanguage_without_region_has_no_single_package()
+    {
+        // `sr` has two candidate packs (`sr-Cyrl` and `sr-Latn`) and no region to disambiguate.
+        $report = $this->report(['tr'], ['sr' => [12, 6]]);
+
+        $this->assertSame('sr', $report[0]['locale']);
         $this->assertNull($report[0]['package']);
     }
 
