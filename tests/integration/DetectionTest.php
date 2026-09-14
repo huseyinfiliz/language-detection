@@ -17,6 +17,7 @@ use Flarum\Testing\integration\RetrievesAuthorizedUsers;
 use Flarum\Testing\integration\TestCase;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Flarum\User\User;
 
 class DetectionTest extends TestCase
 {
@@ -43,7 +44,7 @@ class DetectionTest extends TestCase
         $this->extension('huseyinfiliz-language-detection');
 
         $this->prepareDatabase([
-            'users' => [
+            User::class => [
                 $this->normalUser(),
                 $this->userWhoChoseGerman(),
             ],

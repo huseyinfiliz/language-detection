@@ -14,6 +14,7 @@ namespace HuseyinFiliz\LanguageDetection\Tests\Integration;
 use Carbon\Carbon;
 use Flarum\Testing\integration\TestCase;
 use HuseyinFiliz\LanguageDetection\Cleanup;
+use Flarum\User\User;
 
 class CleanupTest extends TestCase
 {
@@ -28,7 +29,7 @@ class CleanupTest extends TestCase
         $this->extension('huseyinfiliz-language-detection');
 
         $this->prepareDatabase([
-            'users' => [
+            User::class => [
                 $this->normalUser(),
             ],
         ]);

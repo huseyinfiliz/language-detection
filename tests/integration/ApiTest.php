@@ -16,6 +16,7 @@ use Flarum\Locale\LocaleManager;
 use Flarum\Testing\integration\RetrievesAuthorizedUsers;
 use Flarum\Testing\integration\TestCase;
 use Psr\Http\Message\ServerRequestInterface;
+use Flarum\User\User;
 
 /**
  * The two admin endpoints, over HTTP, against a real database.
@@ -52,7 +53,7 @@ class ApiTest extends TestCase
 
         // Id 2, and deliberately not an administrator. The setup script's only user is the
         // administrator at id 1.
-        $this->prepareDatabase(['users' => [$this->normalUser()]]);
+        $this->prepareDatabase([User::class => [$this->normalUser()]]);
     }
 
     public function test_a_guest_cannot_read_a_forums_traffic()

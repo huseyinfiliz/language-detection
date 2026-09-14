@@ -13,12 +13,11 @@ namespace HuseyinFiliz\LanguageDetection\Tests\Unit;
 
 use Flarum\Testing\unit\TestCase;
 use HuseyinFiliz\LanguageDetection\BotDetector;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class BotDetectorTest extends TestCase
 {
-    /**
-     * @dataProvider bots
-     */
+    #[DataProvider('bots')]
     public function test_it_recognises_automated_traffic(string $userAgent, string $why)
     {
         $this->assertTrue((new BotDetector())->isBot($userAgent), $why);
@@ -85,9 +84,7 @@ class BotDetectorTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider humans
-     */
+    #[DataProvider('humans')]
     public function test_it_leaves_real_browsers_alone(string $userAgent, string $why)
     {
         $this->assertFalse((new BotDetector())->isBot($userAgent), $why);

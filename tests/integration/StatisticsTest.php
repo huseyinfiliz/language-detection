@@ -18,6 +18,7 @@ use Flarum\Testing\integration\RetrievesAuthorizedUsers;
 use Flarum\Testing\integration\TestCase;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Flarum\User\User;
 
 /**
  * What ends up in `language_detection_stats` after real requests through the real stack.
@@ -63,7 +64,7 @@ class StatisticsTest extends TestCase
         $this->extension('huseyinfiliz-language-detection');
 
         $this->prepareDatabase([
-            'users' => [
+            User::class => [
                 $this->normalUser(),
             ],
         ]);

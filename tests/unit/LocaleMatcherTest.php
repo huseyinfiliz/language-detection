@@ -15,6 +15,7 @@ use Flarum\Locale\LocaleManager;
 use Flarum\Locale\Translator;
 use Flarum\Testing\unit\TestCase;
 use HuseyinFiliz\LanguageDetection\LocaleMatcher;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class LocaleMatcherTest extends TestCase
 {
@@ -24,9 +25,7 @@ class LocaleMatcherTest extends TestCase
      */
     const INSTALLED = ['en', 'tr', 'pt-BR', 'zh-Hans', 'zh-Hant', 'sr-Cyrl', 'sr-Latn', 'es_MX', 'uzb'];
 
-    /**
-     * @dataProvider candidateProvider
-     */
+    #[DataProvider('candidateProvider')]
     public function test_it_resolves_candidates_against_the_installed_set(array $candidates, ?string $expected)
     {
         $this->assertSame($expected, $this->matcher(self::INSTALLED)->match($candidates));

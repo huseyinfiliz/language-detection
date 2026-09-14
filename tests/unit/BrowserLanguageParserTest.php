@@ -13,6 +13,7 @@ namespace HuseyinFiliz\LanguageDetection\Tests\Unit;
 
 use Flarum\Testing\unit\TestCase;
 use HuseyinFiliz\LanguageDetection\BrowserLanguageParser;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class BrowserLanguageParserTest extends TestCase
 {
@@ -25,9 +26,7 @@ class BrowserLanguageParserTest extends TestCase
         $this->parser = new BrowserLanguageParser();
     }
 
-    /**
-     * @dataProvider headerProvider
-     */
+    #[DataProvider('headerProvider')]
     public function test_it_parses_headers_into_ordered_tags(?string $header, array $expected)
     {
         $this->assertSame($expected, $this->parser->parse($header));
