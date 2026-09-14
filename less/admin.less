@@ -11,8 +11,8 @@
 // area, which is what core 1.x ships; a dark admin theme would override those two rules.
 
 .language-detection-card() {
-  background: var(--body-bg, @body-bg);
-  border: 1px solid var(--control-bg, @control-bg);
+  background: var(--body-bg, var(--body-bg));
+  border: 1px solid var(--control-bg, var(--control-bg));
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
@@ -43,15 +43,15 @@
       border-radius: 999px;
       background: transparent;
       box-shadow: none;
-      color: var(--muted-color, @muted-color);
+      color: var(--muted-color, var(--muted-color));
 
       &:hover {
-        background: var(--control-bg, @control-bg);
+        background: var(--control-bg, var(--control-bg));
       }
 
       &.active {
-        background: var(--control-bg, @control-bg);
-        color: var(--heading-color, @heading-color);
+        background: var(--control-bg, var(--control-bg));
+        color: var(--heading-color, var(--heading-color));
         font-weight: 600;
       }
     }
@@ -63,8 +63,8 @@
     margin-left: 6px;
     padding: 0 6px;
     border-radius: 999px;
-    background: var(--control-bg, @control-bg);
-    color: var(--control-color, @control-color);
+    background: var(--control-bg, var(--control-bg));
+    color: var(--control-color, var(--control-color));
     font-size: 11px;
     font-weight: 600;
     line-height: 18px;
@@ -82,9 +82,9 @@
     margin: 0 0 20px;
     padding: 12px 16px;
     border-radius: 6px;
-    border-left: 3px solid var(--muted-color, @muted-color);
-    background: var(--control-bg, @control-bg);
-    color: var(--text-color, @text-color);
+    border-left: 3px solid var(--muted-color, var(--muted-color));
+    background: var(--control-bg, var(--control-bg));
+    color: var(--text-color, var(--text-color));
   }
 
   .LanguageDetection-section + .LanguageDetection-section {
@@ -124,7 +124,7 @@
   .LanguageDetection-card--clickable {
     display: block;
     width: 100%;
-    border: 1px solid var(--control-bg, @control-bg);
+    border: 1px solid var(--control-bg, var(--control-bg));
     font: inherit;
     text-align: left;
     cursor: pointer;
@@ -134,14 +134,14 @@
 
     &:hover,
     &:focus {
-      border-color: var(--primary-color, @primary-color);
+      border-color: var(--primary-color, var(--primary-color));
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
       outline: none;
     }
   }
 
   .LanguageDetection-card-value {
-    color: var(--heading-color, @heading-color);
+    color: var(--heading-color, var(--heading-color));
     font-size: 24px;
     font-weight: 600;
     line-height: 1.2;
@@ -149,21 +149,21 @@
 
   .LanguageDetection-card-share {
     margin-left: 6px;
-    color: var(--muted-color, @muted-color);
+    color: var(--muted-color, var(--muted-color));
     font-size: 13px;
     font-weight: 400;
   }
 
   .LanguageDetection-card-label {
     margin-top: 4px;
-    color: var(--text-color, @text-color);
+    color: var(--text-color, var(--text-color));
     font-size: 13px;
     font-weight: 600;
   }
 
   .LanguageDetection-card-help {
     margin-top: 4px;
-    color: var(--muted-color, @muted-color);
+    color: var(--muted-color, var(--muted-color));
     font-size: 11px;
     line-height: 1.4;
   }
@@ -196,8 +196,8 @@
   }
 
   .CardList-header {
-    border-bottom: 1px solid var(--control-bg, @control-bg);
-    color: var(--muted-color, @muted-color);
+    border-bottom: 1px solid var(--control-bg, var(--control-bg));
+    color: var(--muted-color, var(--muted-color));
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
@@ -227,7 +227,7 @@
 
   .LanguageDetection-native,
   .LanguageDetection-variants {
-    color: var(--muted-color, @muted-color);
+    color: var(--muted-color, var(--muted-color));
     font-size: 12px;
   }
 
@@ -238,8 +238,8 @@
   .LanguageDetection-code {
     padding: 1px 5px;
     border-radius: 4px;
-    background: var(--control-bg, @control-bg);
-    color: var(--muted-color, @muted-color);
+    background: var(--control-bg, var(--control-bg));
+    color: var(--muted-color, var(--muted-color));
     font-size: 11px;
   }
 
@@ -264,12 +264,12 @@
   .LanguageDetection-pack code {
     padding: 1px 5px;
     border-radius: 4px;
-    background: var(--control-bg, @control-bg);
+    background: var(--control-bg, var(--control-bg));
     font-size: 12px;
   }
 
   .LanguageDetection-noPack {
-    color: var(--muted-color, @muted-color);
+    color: var(--muted-color, var(--muted-color));
     font-size: 12px;
   }
 
@@ -289,11 +289,11 @@
   }
 
   .LanguageDetection-chart-track {
-    fill: var(--control-bg, @control-bg);
+    fill: var(--control-bg, var(--control-bg));
   }
 
   .LanguageDetection-chart-bar {
-    fill: var(--primary-color, @primary-color);
+    fill: var(--primary-color, var(--primary-color));
   }
 
   .LanguageDetection-chart-column:hover .LanguageDetection-chart-track {
@@ -304,7 +304,7 @@
     display: flex;
     justify-content: space-between;
     margin-top: 6px;
-    color: var(--muted-color, @muted-color);
+    color: var(--muted-color, var(--muted-color));
     font-size: 11px;
   }
 
@@ -313,7 +313,7 @@
 
   .LanguageDetection-empty {
     padding: 48px 24px;
-    color: var(--muted-color, @muted-color);
+    color: var(--muted-color, var(--muted-color));
     text-align: center;
 
     .icon {
@@ -342,7 +342,7 @@
   .LanguageDetection-cleanup {
     margin-top: 24px;
     padding-top: 16px;
-    border-top: 1px solid var(--control-bg, @control-bg);
+    border-top: 1px solid var(--control-bg, var(--control-bg));
 
     .helpText {
       margin-top: 8px;
@@ -383,7 +383,7 @@
 
       &::before {
         content: attr(data-label);
-        color: var(--muted-color, @muted-color);
+        color: var(--muted-color, var(--muted-color));
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
