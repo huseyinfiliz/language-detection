@@ -23,11 +23,8 @@ use Psr\Http\Message\ServerRequestInterface;
  */
 class StatisticsController extends AbstractController
 {
-    protected Statistics $statistics;
-
-    public function __construct(Statistics $statistics)
+    public function __construct(protected Statistics $statistics)
     {
-        $this->statistics = $statistics;
     }
 
     /**

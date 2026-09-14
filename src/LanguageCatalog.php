@@ -34,10 +34,6 @@ use Illuminate\Database\ConnectionInterface;
  */
 class LanguageCatalog
 {
-    protected LocaleMatcher $matcher;
-
-    protected ConnectionInterface $db;
-
     protected string $path;
 
     /**
@@ -55,10 +51,8 @@ class LanguageCatalog
     /**
      * @param string|null $path override for tests; defaults to the shipped catalog
      */
-    public function __construct(LocaleMatcher $matcher, ConnectionInterface $db, ?string $path = null)
+    public function __construct(protected LocaleMatcher $matcher, protected ConnectionInterface $db, ?string $path = null)
     {
-        $this->matcher = $matcher;
-        $this->db = $db;
         $this->path = $path ?? dirname(__DIR__).'/resources/languages.php';
     }
 

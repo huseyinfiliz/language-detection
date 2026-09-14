@@ -36,11 +36,8 @@ class AdminPayload
      */
     const KEY = 'huseyinfiliz-language-detection.ipData';
 
-    protected IpCountryLookup $lookup;
-
-    public function __construct(IpCountryLookup $lookup)
+    public function __construct(protected IpCountryLookup $lookup)
     {
-        $this->lookup = $lookup;
     }
 
     public function __invoke(Document $document, ServerRequestInterface $request): void

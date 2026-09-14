@@ -26,11 +26,8 @@ use Psr\Http\Message\ServerRequestInterface;
  */
 class CleanupController extends AbstractController
 {
-    protected Cleanup $cleanup;
-
-    public function __construct(Cleanup $cleanup)
+    public function __construct(protected Cleanup $cleanup)
     {
-        $this->cleanup = $cleanup;
     }
 
     /**

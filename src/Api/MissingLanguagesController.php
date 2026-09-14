@@ -26,11 +26,8 @@ use Psr\Http\Message\ServerRequestInterface;
  */
 class MissingLanguagesController extends AbstractController
 {
-    protected LanguageCatalog $catalog;
-
-    public function __construct(LanguageCatalog $catalog)
+    public function __construct(protected LanguageCatalog $catalog)
     {
-        $this->catalog = $catalog;
     }
 
     /**

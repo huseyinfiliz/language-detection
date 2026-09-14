@@ -55,24 +55,8 @@ class DetectLanguage implements Middleware
 
     const DATE_PATTERN = '/^\d{4}-\d{2}-\d{2}$/';
 
-    protected LanguageDetector $detector;
-
-    protected LocaleManager $locales;
-
-    protected CookieFactory $cookies;
-
-    protected Analytics $analytics;
-
-    public function __construct(
-        LanguageDetector $detector,
-        LocaleManager $locales,
-        CookieFactory $cookies,
-        Analytics $analytics
-    ) {
-        $this->detector = $detector;
-        $this->locales = $locales;
-        $this->cookies = $cookies;
-        $this->analytics = $analytics;
+    public function __construct(protected LanguageDetector $detector, protected LocaleManager $locales, protected CookieFactory $cookies, protected Analytics $analytics)
+    {
     }
 
     public function process(Request $request, Handler $handler): Response

@@ -38,28 +38,8 @@ class Analytics
      */
     const MAX_LOCALE_LENGTH = 20;
 
-    protected ConnectionInterface $db;
-
-    protected BrowserLanguageParser $parser;
-
-    protected IpCountryLookup $lookup;
-
-    protected BotDetector $bots;
-
-    protected SettingsRepositoryInterface $settings;
-
-    public function __construct(
-        ConnectionInterface $db,
-        BrowserLanguageParser $parser,
-        IpCountryLookup $lookup,
-        BotDetector $bots,
-        SettingsRepositoryInterface $settings
-    ) {
-        $this->db = $db;
-        $this->parser = $parser;
-        $this->lookup = $lookup;
-        $this->bots = $bots;
-        $this->settings = $settings;
+    public function __construct(protected ConnectionInterface $db, protected BrowserLanguageParser $parser, protected IpCountryLookup $lookup, protected BotDetector $bots, protected SettingsRepositoryInterface $settings)
+    {
     }
 
     /**

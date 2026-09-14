@@ -102,8 +102,6 @@ class LocaleMatcher
         'no' => 'nb',
     ];
 
-    protected LocaleManager $locales;
-
     /**
      * Normalised code => installed key, verbatim. Built lazily, once per instance.
      *
@@ -111,9 +109,8 @@ class LocaleMatcher
      */
     protected ?array $installed = null;
 
-    public function __construct(LocaleManager $locales)
+    public function __construct(protected LocaleManager $locales)
     {
-        $this->locales = $locales;
     }
 
     /**

@@ -40,17 +40,8 @@ use Illuminate\Database\ConnectionInterface;
  */
 class Statistics
 {
-    protected ConnectionInterface $db;
-
-    protected LanguageCatalog $catalog;
-
-    protected LocaleMatcher $matcher;
-
-    public function __construct(ConnectionInterface $db, LanguageCatalog $catalog, LocaleMatcher $matcher)
+    public function __construct(protected ConnectionInterface $db, protected LanguageCatalog $catalog, protected LocaleMatcher $matcher)
     {
-        $this->db = $db;
-        $this->catalog = $catalog;
-        $this->matcher = $matcher;
     }
 
     /**

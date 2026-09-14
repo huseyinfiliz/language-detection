@@ -26,10 +26,6 @@ class CleanupCommand extends AbstractCommand
 {
     const KEY = 'huseyinfiliz-language-detection.admin.cleanup.';
 
-    protected Cleanup $cleanup;
-
-    protected LocaleManager $locales;
-
     /**
      * `LocaleManager` rather than `TranslatorInterface`, and the difference is load-bearing.
      *
@@ -44,11 +40,8 @@ class CleanupCommand extends AbstractCommand
      * in `storage/locale` with an empty resource list -- which Symfony treats as permanently fresh.
      * Every translation key on the forum renders raw until that directory is cleared by hand.
      */
-    public function __construct(Cleanup $cleanup, LocaleManager $locales)
+    public function __construct(protected Cleanup $cleanup, protected LocaleManager $locales)
     {
-        $this->cleanup = $cleanup;
-        $this->locales = $locales;
-
         parent::__construct();
     }
 

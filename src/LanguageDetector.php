@@ -40,32 +40,8 @@ class LanguageDetector
      */
     const SOURCES = [self::SOURCE_BROWSER, self::SOURCE_IP];
 
-    protected BrowserLanguageParser $parser;
-
-    protected LocaleMatcher $matcher;
-
-    protected IpCountryLookup $lookup;
-
-    protected CountryLanguage $countries;
-
-    protected SettingsRepositoryInterface $settings;
-
-    protected LocaleManager $locales;
-
-    public function __construct(
-        BrowserLanguageParser $parser,
-        LocaleMatcher $matcher,
-        IpCountryLookup $lookup,
-        CountryLanguage $countries,
-        SettingsRepositoryInterface $settings,
-        LocaleManager $locales
-    ) {
-        $this->parser = $parser;
-        $this->matcher = $matcher;
-        $this->lookup = $lookup;
-        $this->countries = $countries;
-        $this->settings = $settings;
-        $this->locales = $locales;
+    public function __construct(protected BrowserLanguageParser $parser, protected LocaleMatcher $matcher, protected IpCountryLookup $lookup, protected CountryLanguage $countries, protected SettingsRepositoryInterface $settings, protected LocaleManager $locales)
+    {
     }
 
     /**

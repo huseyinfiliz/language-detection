@@ -34,14 +34,8 @@ class Cleanup
 
     const DEFAULT_RETENTION = '90';
 
-    protected ConnectionInterface $db;
-
-    protected SettingsRepositoryInterface $settings;
-
-    public function __construct(ConnectionInterface $db, SettingsRepositoryInterface $settings)
+    public function __construct(protected ConnectionInterface $db, protected SettingsRepositoryInterface $settings)
     {
-        $this->db = $db;
-        $this->settings = $settings;
     }
 
     /**
