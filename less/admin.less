@@ -122,7 +122,8 @@
   // unclickable ones beside them (requests, visitors, unstated), plus a hover/focus cue that tells
   // an admin which cards actually go somewhere.
   .LanguageDetection-card--clickable {
-    display: block;
+    display: flex;
+    flex-direction: column;
     width: 100%;
     border: 1px solid var(--control-bg, @control-bg);
     font: inherit;
