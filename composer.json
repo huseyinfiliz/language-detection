@@ -16,8 +16,8 @@
         "source": "https://github.com/huseyinfiliz/language-detection"
     },
     "require": {
-        "php": "^8.0",
-        "flarum/core": "^1.8.0"
+        "php": "^8.3",
+        "flarum/core": "^2.0.0"
     },
     "authors": [
         {
@@ -60,7 +60,7 @@
             }
         }
     },
-    "minimum-stability": "dev",
+    "minimum-stability": "beta",
     "prefer-stable": true,
     "autoload-dev": {
         "psr-4": {
@@ -83,6 +83,6 @@
         "test:setup": "Sets up a database for use with integration tests. Execute this only once."
     },
     "require-dev": {
-        "flarum/testing": "^1.0.0"
+        "flarum/testing": "^2.0.0"
     }
 }
