@@ -56,14 +56,13 @@ class LocaleMatcherTest extends TestCase
             'an absent regional variant falls back to its one sibling' => [['pt-PT'], 'pt-BR'],
             'a bare base language falls back to its one sibling' => [['pt'], 'pt-BR'],
 
-            // Two siblings is a genuine ambiguity, and guessing is worse than declining:
-            // the caller is free to try the next candidate, or the default locale.
-            'two script variants are ambiguous' => [['sr'], null],
+            // Two siblings is a genuine ambiguity; for configured ambiguous macrolanguages,
+            // the preferred variant is chosen (e.g. sr-latn for sr).
+            'two script variants resolve to preferred macrolanguage variant' => [['sr'], 'sr-Latn'],
 
-            // Mapping zh-CN to zh-Hans would need a region-to-script table. It is not
-            // worth one: `resources/countries.php` already covers CN and TW via IP
-            // detection.
-            'a region that implies a script is not guessed' => [['zh-CN'], null],
+            // Full language-region tag whose region unambiguously implies a script pack
+            // resolves directly via REGION_SCRIPT_ALIASES.
+            'a region that implies a script is mapped to that script' => [['zh-CN'], 'zh-Hans'],
 
             // Installed `uzb` and a requested `uz` meet in the middle, and the original
             // key comes back.
@@ -119,10 +118,15 @@ class LocaleMatcherTest extends TestCase
 
     public function test_a_macrolanguage_with_two_members_installed_is_ambiguous()
     {
-        // Handled by tier 3's existing "exactly one" rule, so `no` declines between
-        // Bokmål and Nynorsk exactly as `sr` declines between Cyrillic and Latin.
-        $this->assertNull($this->matcher(['nb', 'nn'])->match(['no']));
+        // For a macrolanguage without a preferred variant (ku), tier 3's "exactly one" rule declines.
         $this->assertNull($this->matcher(['ckb', 'kmr'])->match(['ku']));
+    }
+
+    public function test_an_ambiguous_macrolanguage_with_preference_resolves_to_preferred_variant()
+    {
+        // For a macrolanguage with a preferred variant in AMBIGUOUS_MACROLANGUAGE_PREFERENCE,
+        // it resolves to the preferred variant (no -> nb).
+        $this->assertSame('nb', $this->matcher(['nb', 'nn'])->match(['no']));
     }
 
     public function test_it_matches_nothing_when_no_locales_are_installed()
