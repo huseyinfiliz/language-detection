@@ -189,8 +189,8 @@ class AnalyticsTest extends TestCase
 
         // And on the collision path, where the row already exists, the same two increments have
         // to be expressed as SQL rather than as values.
-        $this->assertSame('requests + 1', $this->expressionValue($this->update()['requests']));
-        $this->assertSame('unique_visitors + 1', $this->expressionValue($this->update()['unique_visitors']));
+        $this->assertSame('language_detection_stats.requests + 1', $this->expressionValue($this->update()['requests']));
+        $this->assertSame('language_detection_stats.unique_visitors + 1', $this->expressionValue($this->update()['unique_visitors']));
     }
 
     public function test_a_returning_visitor_adds_a_view_but_not_a_visitor()
@@ -202,8 +202,8 @@ class AnalyticsTest extends TestCase
         $this->assertSame(1, $this->values()['requests']);
         $this->assertSame(0, $this->values()['unique_visitors']);
 
-        $this->assertSame('requests + 1', $this->expressionValue($this->update()['requests']));
-        $this->assertSame('unique_visitors + 0', $this->expressionValue($this->update()['unique_visitors']));
+        $this->assertSame('language_detection_stats.requests + 1', $this->expressionValue($this->update()['requests']));
+        $this->assertSame('language_detection_stats.unique_visitors + 0', $this->expressionValue($this->update()['unique_visitors']));
     }
 
     public function test_the_increments_are_raw_expressions_and_carry_no_bindings()

@@ -130,6 +130,7 @@ class Analytics
     protected function increment(Carbon $now, string $locale, string $country, bool $newVisitor): void
     {
         $visitor = (int) $newVisitor;
+        $table = (method_exists($this->db, 'getTablePrefix') ? $this->db->getTablePrefix() : '') . self::TABLE;
 
         $this->db->table(self::TABLE)->upsert(
             [
@@ -148,10 +149,10 @@ class Analytics
             // an upsert rather than an ever-growing pile of rows.
             ['date', 'locale', 'country_code'],
             [
-                'requests'        => $this->db->raw('requests + 1'),
+                'requests'        => $this->db->raw($table.'.requests + 1'),
                 // Interpolated because a raw expression carries no bindings. The `(int)` cast above
                 // makes that provably safe: `$visitor` is 0 or 1 and cannot be anything else.
-                'unique_visitors' => $this->db->raw('unique_visitors + '.$visitor),
+                'unique_visitors' => $this->db->raw($table.'.unique_visitors + '.$visitor),
                 'updated_at'      => $now,
             ]
         );
