@@ -58,8 +58,8 @@ class ApiTest extends TestCase
 
     public function test_a_guest_cannot_read_a_forums_traffic()
     {
-        $this->assertSame(403, $this->status(self::STATISTICS, null));
-        $this->assertSame(403, $this->status(self::MISSING, null));
+        $this->assertSame(403, $this->requestStatus(self::STATISTICS, null));
+        $this->assertSame(403, $this->requestStatus(self::MISSING, null));
     }
 
     public function test_an_ordinary_member_cannot_read_a_forums_traffic()
@@ -67,14 +67,14 @@ class ApiTest extends TestCase
         // Signed in is not the same as trusted. What language a forum's visitors ask for and which
         // countries they come from is not a member's business, and this is the assertion that says
         // an authenticated request is checked rather than merely authenticated.
-        $this->assertSame(403, $this->status(self::STATISTICS, 2));
-        $this->assertSame(403, $this->status(self::MISSING, 2));
+        $this->assertSame(403, $this->requestStatus(self::STATISTICS, 2));
+        $this->assertSame(403, $this->requestStatus(self::MISSING, 2));
     }
 
     public function test_an_administrator_can()
     {
-        $this->assertSame(200, $this->status(self::STATISTICS, 1));
-        $this->assertSame(200, $this->status(self::MISSING, 1));
+        $this->assertSame(200, $this->requestStatus(self::STATISTICS, 1));
+        $this->assertSame(200, $this->requestStatus(self::MISSING, 1));
     }
 
     public function test_the_payload_carries_every_section_the_dashboard_draws()
@@ -276,7 +276,7 @@ class ApiTest extends TestCase
     /**
      * The status code of a request as a given user, or as a guest when `$as` is null.
      */
-    protected function status(string $path, ?int $as): int
+    protected function requestStatus(string $path, ?int $as): int
     {
         return $this->send($this->get($path, $as))->getStatusCode();
     }

@@ -21,6 +21,6 @@ jobs:
 
       # Not cosmetic: `flarum/action-build` only commits the built `js/dist` bundle on a
       # push to this branch, so a mismatch here means the shipped bundle is never rebuilt.
-      main_git_branch: 1.x
+      main_git_branch: 2.x
     secrets:
       bundlewatch_github_token: ${{ secrets.BUNDLEWATCH_GITHUB_TOKEN }}
