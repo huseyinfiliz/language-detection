@@ -2,7 +2,7 @@ import app from 'flarum/admin/app';
 import ExtensionPage from 'flarum/admin/components/ExtensionPage';
 import Button from 'flarum/common/components/Button';
 import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
-import icon from 'flarum/common/helpers/icon';
+import Icon from 'flarum/common/components/Icon';
 import type { ExtensionPageAttrs } from 'flarum/admin/components/ExtensionPage';
 
 import CountriesTable from './CountriesTable';
@@ -230,7 +230,7 @@ export default class LanguageDetectionPage extends ExtensionPage<ExtensionPageAt
   failure(): Mithril.Children {
     return (
       <div className="LanguageDetection-empty">
-        {icon('fas fa-exclamation-triangle')}
+        <Icon name="fas fa-exclamation-triangle" />
         <p>{trans('dashboard.load_failed')}</p>
       </div>
     );

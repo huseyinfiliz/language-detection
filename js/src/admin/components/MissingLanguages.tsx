@@ -1,5 +1,5 @@
 import Component from 'flarum/common/Component';
-import icon from 'flarum/common/helpers/icon';
+import Icon from 'flarum/common/components/Icon';
 import type { ComponentAttrs } from 'flarum/common/Component';
 
 import { count, languageLabel, trans } from '../format';
@@ -96,7 +96,7 @@ export default class MissingLanguages extends Component<MissingLanguagesAttrs> {
   empty(): Mithril.Children {
     return (
       <div className="LanguageDetection-empty">
-        {icon('fas fa-check-circle')}
+        <Icon name="fas fa-check-circle" />
         <p>{trans('dashboard.missing_empty')}</p>
       </div>
     );

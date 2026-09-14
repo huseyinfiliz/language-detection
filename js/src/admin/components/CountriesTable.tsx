@@ -1,5 +1,5 @@
 import Component from 'flarum/common/Component';
-import icon from 'flarum/common/helpers/icon';
+import Icon from 'flarum/common/components/Icon';
 import type { ComponentAttrs } from 'flarum/common/Component';
 
 import { count, countryName, trans } from '../format';
@@ -65,7 +65,7 @@ export default class CountriesTable extends Component<CountriesTableAttrs> {
   empty(): Mithril.Children {
     return (
       <div className="LanguageDetection-empty">
-        {icon('fas fa-globe')}
+        <Icon name="fas fa-globe" />
         <p>{trans('dashboard.countries_empty')}</p>
       </div>
     );
