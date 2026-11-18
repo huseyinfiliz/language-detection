@@ -78,6 +78,7 @@ supported by `flarum/testing` before running setup; do not point the test suite 
 Dependabot checks Composer, Yarn, and GitHub Actions dependencies weekly. Minor and patch updates
 are grouped, while Flarum major-version updates require a deliberate compatibility review.
 Node typings stay on the Node 24 major version until the build runtime is upgraded.
+TypeScript major upgrades are coordinated with Flarum's shared tsconfig rather than applied automatically.
 
 The scoped `type-coverage-core/minimatch` resolution selects the supported, patched 6.x line.
 The upstream range also permits 7.x–10.x, which are affected by GHSA-g3hv-75wg-m249. Keep this

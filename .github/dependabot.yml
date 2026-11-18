@@ -28,6 +28,9 @@ updates:
       # Node typings must follow the Node 24 build runtime.
       - dependency-name: '@types/node'
         update-types: [version-update:semver-major]
+      # Compiler major upgrades require compatibility with Flarum's shared tsconfig.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
     groups:
       javascript-minor-patch:
         update-types: [minor, patch]
