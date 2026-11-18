@@ -14,7 +14,7 @@
     "@flarum/prettier-config": "^1.0.0",
     "flarum-tsconfig": "^2.0.0",
     "typescript": "^4.5.4",
-    "@types/node": "^18.19.0",
+    "@types/node": "^26.6.6",
     "typescript-coverage-report": "^2.1.2"
   },
   "scripts": {
