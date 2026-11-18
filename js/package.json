@@ -2,6 +2,10 @@
   "name": "@huseyinfiliz/language-detection",
   "private": true,
   "version": "0.0.0",
+  "packageManager": "yarn@1.22.22",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "devDependencies": {
     "flarum-webpack-config": "^3.0.0",
     "webpack": "^5.65.0",

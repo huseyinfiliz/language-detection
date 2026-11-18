@@ -15,9 +15,8 @@ jobs:
       js_package_manager: yarn
       cache_dependency_path: ./js/yarn.lock
 
-      # The reusable workflow defaults to Node 16, which is long out of support. 20 is the
-      # current LTS and builds this webpack 5 / TypeScript 4 bundle unchanged.
-      node_version: 20
+      # Keep the build on Node 24 LTS, including dependency updates that require Node 22 or newer.
+      node_version: 24
 
       # Not cosmetic: `flarum/action-build` only commits the built `js/dist` bundle on a
       # push to this branch, so a mismatch here means the shipped bundle is never rebuilt.
