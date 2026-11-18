@@ -1,4 +1,3 @@
-/// <reference types="mithril" />
 import Component from 'flarum/common/Component';
 import type { ComponentAttrs } from 'flarum/common/Component';
 import type { CountryRow } from '../types';

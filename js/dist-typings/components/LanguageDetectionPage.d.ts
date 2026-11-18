@@ -1,4 +1,3 @@
-/// <reference types="mithril" />
 import ExtensionPage from 'flarum/admin/components/ExtensionPage';
 import type { ExtensionPageAttrs } from 'flarum/admin/components/ExtensionPage';
 import type { MissingPayload, StatisticsPayload } from '../types';

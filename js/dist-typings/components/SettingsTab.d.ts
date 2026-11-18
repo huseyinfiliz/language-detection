@@ -1,4 +1,3 @@
-/// <reference types="mithril" />
 import Component from 'flarum/common/Component';
 import type AdminPage from 'flarum/admin/components/AdminPage';
 import type { ComponentAttrs } from 'flarum/common/Component';

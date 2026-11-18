@@ -52,6 +52,7 @@ Community translations are welcome.
 
 ## Development
 
+Frontend development requires Node.js 24 LTS and Yarn Classic 1.22.22, matching CI.
 Install PHP dependencies with Composer and JavaScript dependencies with Yarn:
 
 ```bash
@@ -67,6 +68,7 @@ composer test:setup
 composer test:integration
 yarn --cwd js format-check
 yarn --cwd js check-typings
+yarn --cwd js check-typings-coverage
 yarn --cwd js build
 ```
 
@@ -75,6 +77,12 @@ supported by `flarum/testing` before running setup; do not point the test suite 
 
 Dependabot checks Composer, Yarn, and GitHub Actions dependencies weekly. Minor and patch updates
 are grouped, while Flarum major-version updates require a deliberate compatibility review.
+Node typings stay on the Node 24 major version until the build runtime is upgraded.
+
+The scoped `type-coverage-core/minimatch` resolution selects the supported, patched 6.x line.
+The upstream range also permits 7.x–10.x, which are affected by GHSA-g3hv-75wg-m249. Keep this
+resolution until the coverage tool supports an unaffected newer major, then recheck coverage
+generation before removing it.
 
 ## Links
 
