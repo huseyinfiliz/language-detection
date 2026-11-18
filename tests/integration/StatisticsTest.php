@@ -16,9 +16,9 @@ use Dflydev\FigCookies\SetCookie;
 use Flarum\Locale\LocaleManager;
 use Flarum\Testing\integration\RetrievesAuthorizedUsers;
 use Flarum\Testing\integration\TestCase;
+use Flarum\User\User;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use Flarum\User\User;
 
 /**
  * What ends up in `language_detection_stats` after real requests through the real stack.

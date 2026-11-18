@@ -15,7 +15,7 @@ use HuseyinFiliz\LanguageDetection\LanguageCatalog;
 use Psr\Http\Message\ServerRequestInterface;
 
 /**
- * `GET /api/language-detection/missing?days=30`
+ * `GET /api/language-detection/missing?days=30`.
  *
  * The languages visitors asked for that this forum could not serve, each with the package that would
  * fix it.
@@ -41,7 +41,7 @@ class MissingLanguagesController extends AbstractController
         // and renders both under one heading, so a future divergence in defaults is visible rather
         // than mislabelling one table with the other's window.
         return [
-            'days'    => $days,
+            'days' => $days,
             'missing' => $this->catalog->missing($days),
         ];
     }

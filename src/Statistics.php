@@ -64,18 +64,18 @@ class Statistics
         $countries = $this->countriesFrom($this->countryRows($now, $days));
 
         return [
-            'days'      => $days,
-            'summary'   => $this->summaryFrom($languages, $countries),
+            'days' => $days,
+            'summary' => $this->summaryFrom($languages, $countries),
             'languages' => $languages,
             'countries' => $countries,
-            'trend'     => $this->trendFrom($this->trendRows($now, $days), $now, $days),
+            'trend' => $this->trendFrom($this->trendRows($now, $days), $now, $days),
         ];
     }
 
     /**
      * The headline totals.
      *
-     * @internal Use report() when multiple dashboard sections are needed to avoid repeated queries.
+     * @internal use report() when multiple dashboard sections are needed to avoid repeated queries
      *
      * @return array<string, int>
      */
@@ -92,7 +92,7 @@ class Statistics
     /**
      * One row per language visitors asked for, busiest first.
      *
-     * @internal Use report() when multiple dashboard sections are needed to avoid repeated queries.
+     * @internal use report() when multiple dashboard sections are needed to avoid repeated queries
      *
      * @return array<int, array<string, mixed>>
      */
@@ -106,7 +106,7 @@ class Statistics
     /**
      * One row per country visitors came from, busiest first.
      *
-     * @internal Use report() when multiple dashboard sections are needed to avoid repeated queries.
+     * @internal use report() when multiple dashboard sections are needed to avoid repeated queries
      *
      * @return array<int, array<string, mixed>>
      */
@@ -120,7 +120,7 @@ class Statistics
     /**
      * One entry per calendar day in the window, oldest first.
      *
-     * @internal Use report() when multiple dashboard sections are needed to avoid repeated queries.
+     * @internal use report() when multiple dashboard sections are needed to avoid repeated queries
      *
      * @return array<int, array<string, mixed>>
      */
@@ -146,13 +146,13 @@ class Statistics
     public function summaryFrom(array $languages, array $countries): array
     {
         $summary = [
-            'requests'  => 0,
-            'visitors'  => 0,
+            'requests' => 0,
+            'visitors' => 0,
             'languages' => 0,
             'countries' => 0,
-            'served'    => 0,
-            'unserved'  => 0,
-            'unstated'  => 0,
+            'served' => 0,
+            'unserved' => 0,
+            'unstated' => 0,
         ];
 
         foreach ($languages as $row) {
@@ -239,13 +239,13 @@ class Statistics
 
             if (! isset($groups[$key])) {
                 $groups[$key] = [
-                    'locale'   => $key,
-                    'name'     => $entry['name'] ?? null,
-                    'native'   => $entry['native'] ?? null,
-                    'served'   => $served,
+                    'locale' => $key,
+                    'name' => $entry['name'] ?? null,
+                    'native' => $entry['native'] ?? null,
+                    'served' => $served,
                     'requests' => 0,
                     'visitors' => 0,
-                    'tags'     => [],
+                    'tags' => [],
                 ];
             }
 
@@ -276,7 +276,7 @@ class Statistics
 
         foreach ($volumes as $code => $volume) {
             $countries[] = [
-                'country'  => (string) $code,
+                'country' => (string) $code,
                 'requests' => (int) ($volume['requests'] ?? 0),
                 'visitors' => (int) ($volume['visitors'] ?? 0),
             ];
@@ -308,7 +308,7 @@ class Statistics
             $volume = $volumes[$date] ?? [];
 
             $trend[] = [
-                'date'     => $date,
+                'date' => $date,
                 'requests' => (int) ($volume['requests'] ?? 0),
                 'visitors' => (int) ($volume['visitors'] ?? 0),
             ];

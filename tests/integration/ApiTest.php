@@ -15,8 +15,8 @@ use Carbon\Carbon;
 use Flarum\Locale\LocaleManager;
 use Flarum\Testing\integration\RetrievesAuthorizedUsers;
 use Flarum\Testing\integration\TestCase;
-use Psr\Http\Message\ServerRequestInterface;
 use Flarum\User\User;
+use Psr\Http\Message\ServerRequestInterface;
 
 /**
  * The two admin endpoints, over HTTP, against a real database.
@@ -326,12 +326,12 @@ class ApiTest extends TestCase
 
         foreach ($rows as $row) {
             $insert[] = [
-                'date'            => $row[0],
-                'locale'          => $row[1],
-                'requests'        => $row[2],
+                'date' => $row[0],
+                'locale' => $row[1],
+                'requests' => $row[2],
                 'unique_visitors' => $row[3],
                 // Part of the table's unique key, so every seeded row needs one.
-                'country_code'    => $row[4] ?? '',
+                'country_code' => $row[4] ?? '',
             ];
         }
 

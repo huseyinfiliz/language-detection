@@ -13,8 +13,8 @@ namespace HuseyinFiliz\LanguageDetection\Tests\Integration;
 
 use Carbon\Carbon;
 use Flarum\Testing\integration\TestCase;
-use HuseyinFiliz\LanguageDetection\Cleanup;
 use Flarum\User\User;
+use HuseyinFiliz\LanguageDetection\Cleanup;
 
 class CleanupTest extends TestCase
 {
@@ -41,12 +41,12 @@ class CleanupTest extends TestCase
     protected function normalUser(): array
     {
         return [
-            'id'                 => 2,
-            'username'           => 'acme',
-            'email'              => 'acme@example.com',
-            'password'           => '',
+            'id' => 2,
+            'username' => 'acme',
+            'email' => 'acme@example.com',
+            'password' => '',
             'is_email_confirmed' => 1,
-            'joined_at'          => Carbon::now()->toDateTimeString(),
+            'joined_at' => Carbon::now()->toDateTimeString(),
         ];
     }
 
@@ -144,10 +144,10 @@ class CleanupTest extends TestCase
 
         foreach ($ages as $index => $age) {
             $insert[] = [
-                'date'            => $this->daysAgo($age),
-                'locale'          => 'l'.$index,
-                'country_code'    => '',
-                'requests'        => 1,
+                'date' => $this->daysAgo($age),
+                'locale' => 'l'.$index,
+                'country_code' => '',
+                'requests' => 1,
                 'unique_visitors' => 1,
             ];
         }

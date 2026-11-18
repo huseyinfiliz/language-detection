@@ -132,13 +132,13 @@ class LanguageCatalog
                 $entry = $this->all()[$key] ?? null;
 
                 $groups[$key] = [
-                    'locale'   => $key,
-                    'name'     => $entry['name'] ?? null,
-                    'native'   => $entry['native'] ?? null,
-                    'package'  => $entry['package'] ?? null,
+                    'locale' => $key,
+                    'name' => $entry['name'] ?? null,
+                    'native' => $entry['native'] ?? null,
+                    'package' => $entry['package'] ?? null,
                     'requests' => 0,
                     'visitors' => 0,
-                    'tags'     => [],
+                    'tags' => [],
                 ];
             }
 

@@ -15,7 +15,7 @@ use HuseyinFiliz\LanguageDetection\Statistics;
 use Psr\Http\Message\ServerRequestInterface;
 
 /**
- * `GET /api/language-detection/statistics?days=30`
+ * `GET /api/language-detection/statistics?days=30`.
  *
  * The whole dashboard in one response: the summary cards, the languages table, the countries table and
  * the trend. One request rather than four, so every figure on the page comes from the same instant and

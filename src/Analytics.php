@@ -129,30 +129,30 @@ class Analytics
     protected function increment(Carbon $now, string $locale, string $country, bool $newVisitor): void
     {
         $visitor = (int) $newVisitor;
-        $table = (method_exists($this->db, 'getTablePrefix') ? $this->db->getTablePrefix() : '') . self::TABLE;
+        $table = (method_exists($this->db, 'getTablePrefix') ? $this->db->getTablePrefix() : '').self::TABLE;
 
         $this->db->table(self::TABLE)->upsert(
             [
-                'date'            => $now->toDateString(),
-                'locale'          => $locale,
-                'country_code'    => $country,
-                'requests'        => 1,
+                'date' => $now->toDateString(),
+                'locale' => $locale,
+                'country_code' => $country,
+                'requests' => 1,
                 'unique_visitors' => $visitor,
                 // The query builder does not maintain timestamps, and the migration declares both
                 // columns nullable with no default, so they are set here or they stay null.
-                'created_at'      => $now,
-                'updated_at'      => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
             ],
             // Ignored by the MySQL grammar, which compiles `on duplicate key update` and lets the
             // index decide, but passed anyway to document which index has to exist for this to be
             // an upsert rather than an ever-growing pile of rows.
             ['date', 'locale', 'country_code'],
             [
-                'requests'        => $this->db->raw($table.'.requests + 1'),
+                'requests' => $this->db->raw($table.'.requests + 1'),
                 // Interpolated because a raw expression carries no bindings. The `(int)` cast above
                 // makes that provably safe: `$visitor` is 0 or 1 and cannot be anything else.
                 'unique_visitors' => $this->db->raw($table.'.unique_visitors + '.$visitor),
-                'updated_at'      => $now,
+                'updated_at' => $now,
             ]
         );
     }

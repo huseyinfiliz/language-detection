@@ -218,13 +218,13 @@ class MissingLanguagesTest extends TestCase
 
         foreach ($rows as $row) {
             $insert[] = [
-                'date'            => $row[0],
-                'locale'          => $row[1],
-                'requests'        => $row[2],
+                'date' => $row[0],
+                'locale' => $row[1],
+                'requests' => $row[2],
                 'unique_visitors' => $row[3],
                 // Part of the table's unique key, so every seeded row needs one. `''` is what
                 // `Analytics` writes for a visitor it cannot place, and is the realistic value.
-                'country_code'    => $row[4] ?? '',
+                'country_code' => $row[4] ?? '',
             ];
         }
 
