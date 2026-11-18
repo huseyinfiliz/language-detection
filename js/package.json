@@ -13,7 +13,7 @@
     "prettier": "^3.10.1",
     "@flarum/prettier-config": "^1.0.0",
     "flarum-tsconfig": "^2.0.0",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "@types/node": "^24.0.0",
     "typescript-coverage-report": "^2.1.2"
   },
