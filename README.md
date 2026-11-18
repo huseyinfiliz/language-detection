@@ -16,7 +16,8 @@ A [Flarum](https://flarum.org) extension that automatically detects a visitor's 
 
 ## Requirements
 
-- Flarum `1.x`
+- Flarum `^2.0.0`
+- PHP `^8.3`
 - A Flarum language pack for each locale you want to serve
 
 ## Installation
@@ -48,6 +49,32 @@ Statistics collection is configurable and can be disabled by administrators.
 The extension ships with English translations.
 
 Community translations are welcome.
+
+## Development
+
+Install PHP dependencies with Composer and JavaScript dependencies with Yarn:
+
+```bash
+composer install
+yarn --cwd js install --frozen-lockfile
+```
+
+Run the checks and build the admin bundle:
+
+```bash
+composer test:unit
+composer test:setup
+composer test:integration
+yarn --cwd js format-check
+yarn --cwd js check-typings
+yarn --cwd js build
+```
+
+Integration tests require a dedicated test database. Configure the `DB_*` environment variables
+supported by `flarum/testing` before running setup; do not point the test suite at a forum database.
+
+Dependabot checks Composer, Yarn, and GitHub Actions dependencies weekly. Minor and patch updates
+are grouped, while Flarum major-version updates require a deliberate compatibility review.
 
 ## Links
 
