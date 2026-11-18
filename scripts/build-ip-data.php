@@ -77,7 +77,7 @@ exit(main($argv));
 function main(array $argv): int
 {
     $options = options($argv);
-    $out = rtrim($options['out'] ?? dirname(__DIR__).'/resources', "/\\");
+    $out = rtrim($options['out'] ?? dirname(__DIR__).'/resources', '/\\');
 
     if (! is_dir($out)) {
         return fail("not a directory: $out");
@@ -89,7 +89,7 @@ function main(array $argv): int
 
     foreach (REGISTRIES as $registry => $url) {
         $body = isset($options['source'])
-            ? read(rtrim($options['source'], "/\\").'/'.basename($url))
+            ? read(rtrim($options['source'], '/\\').'/'.basename($url))
             : download($url);
 
         if ($body === null) {
@@ -416,10 +416,10 @@ function build(array $ranges, int $width): array
 function add(string $key, int $amount): ?string
 {
     for ($i = strlen($key) - 1; $i >= 0 && $amount > 0; $i--) {
-        $sum = ord($key[$i]) + ($amount & 0xff);
+        $sum = ord($key[$i]) + ($amount & 0xFF);
         $amount >>= 8;
 
-        if ($sum > 0xff) {
+        if ($sum > 0xFF) {
             $sum -= 0x100;
             $amount++;
         }
