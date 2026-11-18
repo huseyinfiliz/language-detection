@@ -70,7 +70,7 @@ class BrowserLanguageParser
             }
         }
 
-        // Sorting is stable in PHP 8, which composer.json's `php: ^8.0` guarantees, so header
+        // Sorting is stable in PHP 8, which composer.json's `php: ^8.3` guarantees, so header
         // order survives among equal q-values. Browsers list tags in preference order and
         // frequently omit q entirely.
         usort($tags, function (array $a, array $b) {

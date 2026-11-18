@@ -18,7 +18,7 @@ use Psr\Http\Message\ServerRequestInterface;
  *
  * Two signals, in this order: a country header set by the CDN or web server in front of the forum,
  * then the bundled dataset. The header comes first even though it is spoofable, because it is the only
- * signal that survives a reverse proxy -- Flarum 1.x resolves the visitor's address from `REMOTE_ADDR`
+ * signal that survives a reverse proxy -- core's `ProcessIp` reads the address from `REMOTE_ADDR`
  * alone (`Http\Middleware\ProcessIp` honours no `X-Forwarded-For`), so behind Cloudflare or a tunnel
  * the address handed to this class may be the proxy's own while `CF-IPCountry` still describes the
  * visitor. Spoofing it changes nothing but which language is offered, and a visitor can already send
@@ -214,6 +214,8 @@ class IpCountryLookup
      * Binary search for the last record whose range starts at or before the address.
      *
      * The file is contiguous and exhaustive, so "unknown" is spelled as a record rather than a hole.
+     * Native file streams provide fixed-record random access without loading the dataset into memory;
+     * a storage-disk abstraction does not provide the byte-level seek operations this search needs.
      */
     protected function search(string $file, int $recordSize, int $keySize, string $key): ?string
     {

@@ -40,9 +40,7 @@ class LocaleMatcher
      * keys, `uzb` is the only one with an ISO 639-1 equivalent -- `ast`, `fil`, `kab`, `ckb`, `kmr`
      * and `tok` have none, so browsers send them verbatim and exact matching already works.
      */
-    const CODE_ALIASES = [
-        'uzb' => 'uz',
-    ];
+    const CODE_ALIASES = LocaleNormalizer::CODE_ALIASES;
 
     /**
      * Full language-region tags whose region unambiguously implies a script Flarum
@@ -50,29 +48,22 @@ class LocaleMatcher
      *
      * Browsers send region variants (`zh-CN`, `zh-TW`) rather than the script subtags Flarum
      * actually publishes packs under (`zh-Hans`, `zh-Hant`). Without this, `zh-CN` falls through
-     * to tier 3's sibling check, finds *both* `zh-Hans` and `zh-Hant` installed under the `zh`
-     * base, and is declined as ambiguous -- even though the region already answers the question.
+     * to tier 3's sibling check, where a preferred variant could override the explicit region.
+     * Mapping the region first preserves that information when both scripts are installed.
      * Unlike `CODE_ALIASES`, this maps the whole tag rather than just the language subtag, and is
      * checked before subtag splitting so the match happens at tier 1 instead of tier 3.
      *
-     * A bare `zh` (no region) is deliberately left out: with no region to disambiguate, falling
-     * through to tier 3 and declining when both scripts are installed is the correct behaviour,
-     * the same as it is for `sr` (Cyrillic vs Latin) and `no` (Bokmål vs Nynorsk).
+     * Bare macrolanguages are deliberately left out: tier 3 handles them using the installed
+     * variants and, where configured, `AMBIGUOUS_MACROLANGUAGE_PREFERENCE`.
      */
-    const REGION_SCRIPT_ALIASES = [
-        'zh-cn' => 'zh-hans',
-        'zh-sg' => 'zh-hans',
-        'zh-tw' => 'zh-hant',
-        'zh-hk' => 'zh-hant',
-        'zh-mo' => 'zh-hant',
-    ];
+    const REGION_SCRIPT_ALIASES = LocaleNormalizer::REGION_SCRIPT_ALIASES;
 
     /**
      * Macrolanguages mapped to the concrete codes Flarum publishes packs for.
      *
      * These feed tier 3's existing "exactly one installed" rule rather than adding a mechanism:
-     * `no` resolves to `nb` when Bokmål alone is installed, and declines when both Bokmål and
-     * Nynorsk are. Real browsers do send bare `no`, and without this the missing-languages report
+     * `no` resolves to `nb` when Bokmål alone is installed; when both are installed, the configured
+     * preference also selects Bokmål. Real browsers send bare `no`, and without this mapping the report
      * would list it as missing on a forum that has Norwegian installed.
      */
     const MACROLANGUAGES = [
@@ -178,8 +169,8 @@ class LocaleMatcher
      * The one installed variant of a base language, if there is exactly one.
      *
      * `pt-PT` (or a bare `pt`) resolves to `pt-BR` when that is the only Portuguese pack installed.
-     * Two variants is a genuine ambiguity -- is `sr` Cyrillic or Latin? -- and declining leaves the
-     * caller free to try the next candidate, which is better than guessing wrong.
+     * Multiple variants normally leave the caller free to try the next candidate. The explicit
+     * macrolanguage preferences below provide a fallback for selected ambiguous cases.
      *
      * Tiers 1 and 2 have already established that the base language itself is not installed by the
      * time this runs, so only its variants can match here.
@@ -206,8 +197,7 @@ class LocaleMatcher
             return reset($matches);
         }
 
-        // More than one variant installed: normally an unresolvable ambiguity (see the class
-        // docblock's `sr` example). For the small set of macrolanguages in
+        // More than one variant installed: normally an unresolvable ambiguity. For the small set in
         // `AMBIGUOUS_MACROLANGUAGE_PREFERENCE`, a wrong guess is cheap enough that picking the
         // preferred variant beats falling through to the caller's default_locale.
         if (count($matches) > 1 && isset(self::AMBIGUOUS_MACROLANGUAGE_PREFERENCE[$base])) {
@@ -255,24 +245,6 @@ class LocaleMatcher
      */
     protected function normalize(string $code): string
     {
-        $code = strtolower(str_replace('_', '-', trim($code)));
-
-        if ($code === '') {
-            return '';
-        }
-
-        if (isset(self::REGION_SCRIPT_ALIASES[$code])) {
-            return self::REGION_SCRIPT_ALIASES[$code];
-        }
-
-        $subtags = explode('-', $code);
-
-        if (isset(self::CODE_ALIASES[$subtags[0]])) {
-            $subtags[0] = self::CODE_ALIASES[$subtags[0]];
-
-            return implode('-', $subtags);
-        }
-
-        return $code;
+        return LocaleNormalizer::normalize($code);
     }
 }

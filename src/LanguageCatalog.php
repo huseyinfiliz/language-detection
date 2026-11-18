@@ -271,43 +271,12 @@ class LanguageCatalog
     /**
      * Fold a code into a form safe to compare -- never to output.
      *
-     * The same lines as `LocaleMatcher::normalize()`, repeated rather than shared for the same
-     * reason `Analytics` repeats them: what is compared here is a requested tag against a *published
-     * catalog*, not against a forum's installed locales.
-     *
-     * `REGION_SCRIPT_ALIASES` is checked first, against the full tag -- exactly as in
-     * `LocaleMatcher::normalize()` -- so a region that implies a script (`zh-CN`, `zh-TW`) is folded
-     * to that script's catalog key before subtag splitting. Skipping this step was the bug behind an
-     * admin-visible "unrecognised language tag" for `zh-cn`: `LocaleMatcher::match()` already applied
-     * this alias and correctly reported the tag as served, while this method, missing the same alias,
-     * folded `zh-cn` to itself, found no catalog entry, and returned null -- so `missingFrom()` (and
-     * any caller using `entryFor()` to label an already-served tag) showed no name for a tag the
-     * forum was, in fact, serving.
-     *
-     * `CODE_ALIASES` is read rather than copied, and mind its direction -- it maps catalog key to the
-     * code a browser sends (`uzb` => `uz`), so applying it to both sides files catalog `uzb` under
-     * `uz` and lets a requested `uz` find it.
+     * Share comparison keys with `LocaleMatcher`, including Chinese region-to-script mappings and
+     * published-code aliases. Only the matching policy differs: this catalog does not choose a
+     * sibling when the requested code is ambiguous. Raw analytics tags remain independent of both.
      */
     protected function fold(string $code): string
     {
-        $code = strtolower(str_replace('_', '-', trim($code)));
-
-        if ($code === '') {
-            return '';
-        }
-
-        if (isset(LocaleMatcher::REGION_SCRIPT_ALIASES[$code])) {
-            return LocaleMatcher::REGION_SCRIPT_ALIASES[$code];
-        }
-
-        $subtags = explode('-', $code);
-
-        if (isset(LocaleMatcher::CODE_ALIASES[$subtags[0]])) {
-            $subtags[0] = LocaleMatcher::CODE_ALIASES[$subtags[0]];
-
-            return implode('-', $subtags);
-        }
-
-        return $code;
+        return LocaleNormalizer::normalize($code);
     }
 }

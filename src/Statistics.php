@@ -75,6 +75,8 @@ class Statistics
     /**
      * The headline totals.
      *
+     * @internal Use report() when multiple dashboard sections are needed to avoid repeated queries.
+     *
      * @return array<string, int>
      */
     public function summary(int $days): array
@@ -90,6 +92,8 @@ class Statistics
     /**
      * One row per language visitors asked for, busiest first.
      *
+     * @internal Use report() when multiple dashboard sections are needed to avoid repeated queries.
+     *
      * @return array<int, array<string, mixed>>
      */
     public function languages(int $days): array
@@ -102,6 +106,8 @@ class Statistics
     /**
      * One row per country visitors came from, busiest first.
      *
+     * @internal Use report() when multiple dashboard sections are needed to avoid repeated queries.
+     *
      * @return array<int, array<string, mixed>>
      */
     public function countries(int $days): array
@@ -113,6 +119,8 @@ class Statistics
 
     /**
      * One entry per calendar day in the window, oldest first.
+     *
+     * @internal Use report() when multiple dashboard sections are needed to avoid repeated queries.
      *
      * @return array<int, array<string, mixed>>
      */

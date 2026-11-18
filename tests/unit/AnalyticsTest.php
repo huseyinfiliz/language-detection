@@ -87,6 +87,15 @@ class AnalyticsTest extends TestCase
         }
     }
 
+    public function test_matching_aliases_do_not_rewrite_recorded_language_tags()
+    {
+        foreach (['zh-CN' => 'zh-cn', 'zh_TW' => 'zh-tw', 'uzb-UZ' => 'uzb-uz'] as $tag => $expected) {
+            $this->analytics()->record($this->request($tag), true, $this->now());
+
+            $this->assertSame($expected, $this->values()['locale']);
+        }
+    }
+
     public function test_a_visitor_who_asked_for_nothing_is_still_counted()
     {
         // Recorded under the empty locale rather than skipped. A large `''` bucket is worth

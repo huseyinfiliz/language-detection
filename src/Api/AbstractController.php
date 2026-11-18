@@ -25,7 +25,7 @@ use Psr\Http\Server\RequestHandlerInterface;
  * an endpoint registered without the check would publish that to anyone who guessed the URL, silently,
  * because the payload looks the same either way.
  *
- * There is no permission to check and none declared. Flarum 1.x's admin frontend is reachable by
+ * There is no permission to check and none declared. Flarum's admin frontend is reachable by
  * administrators alone, so `assertAdmin()` is the whole authorisation model here.
  *
  * These are plain PSR-15 handlers returning `JsonResponse` rather than JSON:API documents. Nothing

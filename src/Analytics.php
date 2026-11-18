@@ -97,9 +97,8 @@ class Analytics
      * The language this visitor asked for, lowercased with underscores folded to hyphens so that
      * `tr-TR`, `tr_TR` and `TR-tr` are one row rather than three.
      *
-     * This repeats a line of `LocaleMatcher`'s normalisation rather than calling into it on purpose:
-     * that one normalises to compare against installed locales, this one to group rows in a table,
-     * and tying them together would let a change to matching silently re-key a year of history.
+     * Unlike `LocaleNormalizer`, this does not apply pack-code or region-to-script aliases. Preserve
+     * the requested spelling so changes to comparison keys do not re-key historical statistics.
      *
      * @return string the empty string when the visitor asked for nothing usable
      */
